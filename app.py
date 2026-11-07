@@ -26,9 +26,12 @@ with tab1:
         
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("Helvetica", size=12)
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_font("Helvetica", size=10)
+        
         for line in text_runs:
-            pdf.multi_cell(0, 10, txt=line.encode('latin-1', 'replace').decode('latin-1'))
+            safe_line = line.encode('latin-1', 'replace').decode('latin-1')
+            pdf.multi_cell(0, 8, txt=safe_line)
         
         pdf_output = pdf.output()
         
@@ -47,4 +50,3 @@ with tab2:
     if uploaded_img:
         st.image(uploaded_img, caption="الصورة المرفوعة", use_container_width=True)
         st.info("💡 لقراءة المعادلات الرياضية بدقة عالية، يمكن إضافة مفتاح Mathpix API أو OpenAI Vision مستقبلاً.")
-      
