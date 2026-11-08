@@ -8,8 +8,8 @@ st.title("📚 منصة توليد الجذاذات الرياضية الرسم�
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة مع النصوص والصور"):
-    with st.spinner("جاري استخراج النصوص والصور وتنسيق الجذاذة..."):
+if uploaded_ppt and st.button("توليد الجذاذة بتصميم مثالي"):
+    with st.spinner("جاري استخراج النصوص والصور وتنسيق الخلفيات..."):
         prs = Presentation(uploaded_ppt)
         slide_contents = []
         
@@ -21,14 +21,12 @@ if uploaded_ppt and st.button("توليد الجذاذة مع النصوص وا�
             slide_elements.append(("TITLE", f"--- الشريحة رقم {slide_idx} ---"))
             
             for shape in slide.shapes:
-                # 1. استخراج النصوص العادية
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
                         txt = paragraph.text.strip()
                         if txt:
                             slide_elements.append(("TEXT", txt))
                 
-                # 2. استخراج الصور الأصلية (معادلات مرسومة، أشكال، رسوم هندسية)
                 elif shape.shape_type == 13:
                     try:
                         img_counter += 1
@@ -37,7 +35,6 @@ if uploaded_ppt and st.button("توليد الجذاذة مع النصوص وا�
                         with open(img_filename, "wb") as f:
                             f.write(image_bytes)
                         
-                        # تحويل الصورة إلى Base64 لضمان ظهورها مباشرة داخل ملف الـ HTML/A4
                         with open(img_filename, "rb") as img_file:
                             encoded_img = base64.b64encode(img_file.read()).decode('utf-8')
                         img_tag = f"data:image/png;base64,{encoded_img}"
@@ -48,7 +45,7 @@ if uploaded_ppt and st.button("توليد الجذاذة مع النصوص وا�
             
             slide_contents.append(slide_elements)
 
-        # تصميم صفحة A4 بيضاء نقية ومنسقة بدقة للطباعة مع الصور والنصوص
+        # تصميم A4 مع تأثير مرشح (CSS Filter) لتبييض خلفية الصور وجعلها متناسقة
         html_content = """
         <!DOCTYPE html>
         <html lang="fr">
@@ -87,13 +84,15 @@ if uploaded_ppt and st.button("توليد الجذاذة مع النصوص وا�
                     margin: 6px 0;
                 }
                 .slide-image {
-                    max-width: 70%;
+                    max-width: 40%;
                     height: auto;
                     display: block;
-                    margin: 10px 0;
-                    border: 1px solid #eee;
-                    padding: 3px;
-                    background: #fff;
+                    margin: 10px auto; /* توسيط الصورة في المنتصف */
+                    padding: 4px;
+                    background: #ffffff;
+                    /* مرشح لجعل خلفية الصورة الزرقاء تندمج وتصبح بيضاء نقية */
+                    filter: contrast(120%) brightness(105%);
+                    mix-blend-mode: multiply; 
                 }
                 @media print {
                     body { background: none; padding: 0; }
@@ -117,27 +116,27 @@ if uploaded_ppt and st.button("توليد الجذاذة مع النصوص وا�
                     continue
 
                 text = text_or_img
-                color = "#000000"  # الأسود لباقي الفقرات
+                color = "#000000"
                 weight = "normal"
 
-                # تطبيق الألوان البيداغوجية حسب طلبك:
+                # الألوان البيداغوجية
                 if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                    color = "#C80000"  # أحمر عناوين للأرقام الرومانية
+                    color = "#C80000"  # أحمر
                     weight = "bold"
                 elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                    color = "#008000"  # أخضر للعناوين العادية
+                    color = "#008000"  # أخضر
                     weight = "bold"
                 elif "Règle" in text or "Regle" in text:
-                    color = "#800080"  # بنفسجي للقواعد
+                    color = "#800080"  # بنفسجي
                     weight = "bold"
                 elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                    color = "#0066CC"  # أزرق سماوي للأنشطة والتعريفات والأمثلة
+                    color = "#0066CC"  # أزرق سماوي
                     weight = "bold"
                 elif "Propriété" in text or "Propriete" in text:
-                    color = "#FF8000"  # برتقالي للخاصيات
+                    color = "#FF8000"  # برتقالي
                     weight = "bold"
                 elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                    color = "#8B4513"  # بني للتطبيقات والتمارين
+                    color = "#8B4513"  # بني
                     weight = "bold"
 
                 html_content += f'<p class="content-line" style="color: {color}; font-weight: {weight};">{text}</p>'
@@ -148,17 +147,15 @@ if uploaded_ppt and st.button("توليد الجذاذة مع النصوص وا�
         </html>
         """
 
-        st.success("تم توليد الجذاذة مع النصوص والصور الأصلية وتنسيق A4 بنجاح!")
+        st.success("تم تعديل حجم وخلفية الصور لتتطابق تماماً مع صفحة A4 البيضاء!")
         
-        # معاينة الجذاذة داخل الإطار
-        st.markdown("### 📄 معاينة الجذاذة النهائية:")
+        st.markdown("### 📄 معاينة الجذاذة بالخلفية البيضاء للصور:")
         st.components.v1.html(html_content, height=700, scrolling=True)
 
-        # زر التحميل المباشر
         st.download_button(
-            label="⬇️ تحميل الجذاذة كملف HTML (اضغط Ctrl+P للطباعة كـ PDF)",
+            label="⬇️ تحميل الجذاذة النهائية بصيغة HTML (جاهزة للطباعة)",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_A4_Mathematiques_Complete.html",
+            file_name="Jadad_A4_Perfect.html",
             mime="html"
-        )
+                )
         
