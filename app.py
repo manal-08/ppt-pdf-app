@@ -3,13 +3,13 @@ from pptx import Presentation
 import os
 import base64
 
-st.set_page_config(page_title="صانع الجذاذات الرياضية الذكي", layout="centered")
-st.title("📚 منصة توليد الجذاذات الرياضية الرسمية")
+st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
+st.title("📚 صانع الجذاذات الرياضية - تصميم الجدول الأفقي (A4 Landscape)")
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة بتصميم مثالي"):
-    with st.spinner("جاري استخراج النصوص والصور وتنسيق الخلفيات..."):
+if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدول الرسمي"):
+    with st.spinner("جاري بناء الجدول الأفقي وإدراج النصوص والصور..."):
         prs = Presentation(uploaded_ppt)
         slide_contents = []
         
@@ -45,70 +45,116 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم مثالي
             
             slide_contents.append(slide_elements)
 
-        # تصميم A4 مع تأثير مرشح (CSS Filter) لتبييض خلفية الصور وجعلها متناسقة
+        # تصميم الجدول الأفقي A4 Landscape المطابق تماماً للنموذج الرسمي
         html_content = """
         <!DOCTYPE html>
         <html lang="fr">
         <head>
             <meta charset="UTF-8">
             <style>
+                @page {
+                    size: A4 landscape;
+                    margin: 5mm;
+                }
                 body {
                     background-color: #555;
                     margin: 0;
-                    padding: 20px;
+                    padding: 10px;
                     display: flex;
                     justify-content: center;
                 }
-                .a4-page {
+                .a4-landscape {
                     background-color: #ffffff;
-                    width: 210mm;
-                    min-height: 297mm;
-                    padding: 20mm;
+                    width: 297mm;
+                    min-height: 210mm;
+                    padding: 10mm;
                     margin: auto;
                     box-shadow: 0 0 10px rgba(0,0,0,0.3);
                     box-sizing: border-box;
                     font-family: Arial, sans-serif;
                     direction: ltr;
                     color: #000000;
-                    font-size: 14px;
-                    line-height: 1.5;
+                    font-size: 13px;
                 }
-                h3.slide-title {
+                table.fiche-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                }
+                table.fiche-table th, table.fiche-table td {
+                    border: 1px solid #000000;
+                    padding: 8px;
+                    vertical-align: top;
+                    box-sizing: border-box;
+                }
+                table.fiche-table th {
+                    background-color: #f2f2f2;
+                    text-align: center;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: #333;
+                }
+                /* عرض الأعمدة الرسمية للجذاذة */
+                .col-seance { width: 7%; text-align: center; }
+                .col-duree { width: 7%; text-align: center; }
+                .col-contenu { width: 52%; }
+                .col-ens { width: 11%; }
+                .col-app { width: 11%; }
+                .col-obs { width: 12%; }
+
+                .slide-title {
                     color: #646464;
-                    border-bottom: 1px solid #ddd;
-                    padding-bottom: 4px;
-                    margin-top: 25px;
-                    font-size: 15px;
+                    border-bottom: 1px solid #ccc;
+                    padding-bottom: 3px;
+                    margin-top: 15px;
+                    font-size: 13px;
+                    font-weight: bold;
                 }
-                p.content-line {
-                    margin: 6px 0;
+                .content-line {
+                    margin: 5px 0;
+                    line-height: 1.4;
                 }
                 .slide-image {
-                    max-width: 40%;
+                    max-width: 45%;
                     height: auto;
                     display: block;
-                    margin: 10px auto; /* توسيط الصورة في المنتصف */
-                    padding: 4px;
+                    margin: 8px auto;
+                    padding: 2px;
                     background: #ffffff;
-                    /* مرشح لجعل خلفية الصورة الزرقاء تندمج وتصبح بيضاء نقية */
                     filter: contrast(120%) brightness(105%);
-                    mix-blend-mode: multiply; 
+                    mix-blend-mode: multiply;
                 }
                 @media print {
                     body { background: none; padding: 0; }
-                    .a4-page { box-shadow: none; width: 100%; padding: 10mm; }
+                    .a4-landscape { box-shadow: none; width: 100%; padding: 0; }
                 }
             </style>
         </head>
         <body>
-            <div class="a4-page">
-                <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Fiche Pédagogique - Mathématiques</h2>
+            <div class="a4-landscape">
+                <table class="fiche-table">
+                    <thead>
+                        <tr>
+                            <th class="col-seance">Séance</th>
+                            <th class="col-duree">Durée</th>
+                            <th class="col-contenu">Contenu</th>
+                            <th class="col-ens">Rôle de l'enseignant</th>
+                            <th class="col-app">Rôle de l'apprenant</th>
+                            <th class="col-obs">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="col-seance"></td>
+                            <td class="col-duree"></td>
+                            <td class="col-contenu">
         """
 
+        # إدراج المحتوى داخل خلية Contenu بالترتيب والألوان الدقيقة
         for slide_elements in slide_contents:
             for el_type, text_or_img in slide_elements:
                 if el_type == "TITLE":
-                    html_content += f'<h3 class="slide-title">{text_or_img}</h3>'
+                    html_content += f'<div class="slide-title">{text_or_img}</div>'
                     continue
                 
                 if el_type == "IMAGE":
@@ -119,43 +165,52 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم مثالي
                 color = "#000000"
                 weight = "normal"
 
-                # الألوان البيداغوجية
+                # الألوان البيداغوجية حسب طلبك الدقيق:
                 if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                    color = "#C80000"  # أحمر
+                    color = "#C80000"  # أحمر عناوين للأرقام الرومانية
                     weight = "bold"
                 elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                    color = "#008000"  # أخضر
+                    color = "#008000"  # أخضر للعناوين العادية
                     weight = "bold"
                 elif "Règle" in text or "Regle" in text:
-                    color = "#800080"  # بنفسجي
+                    color = "#800080"  # بنفسجي للقواعد
                     weight = "bold"
                 elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                    color = "#0066CC"  # أزرق سماوي
+                    color = "#0066CC"  # أزرق سماوي للأنشطة والتعريفات والأمثلة
                     weight = "bold"
                 elif "Propriété" in text or "Propriete" in text:
-                    color = "#FF8000"  # برتقالي
+                    color = "#FF8000"  # برتقالي للخاصيات
                     weight = "bold"
                 elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                    color = "#8B4513"  # بني
+                    color = "#8B4513"  # بني للتطبيقات والتمارين
                     weight = "bold"
 
-                html_content += f'<p class="content-line" style="color: {color}; font-weight: {weight};">{text}</p>'
+                html_content += f'<div class="content-line" style="color: {color}; font-weight: {weight};">{text}</div>'
 
         html_content += """
+                            </td>
+                            <td class="col-ens"></td>
+                            <td class="col-app"></td>
+                            <td class="col-obs"></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </body>
         </html>
         """
 
-        st.success("تم تعديل حجم وخلفية الصور لتتطابق تماماً مع صفحة A4 البيضاء!")
+        st.success("تم توليد الجذاذة بتصميم الجدول الأفقي الرسمي بنجاح!")
         
-        st.markdown("### 📄 معاينة الجذاذة بالخلفية البيضاء للصور:")
-        st.components.v1.html(html_content, height=700, scrolling=True)
+        # معاينة الجذاذة
+        st.markdown("### 📄 معاينة الجذاذة (تصميم جدول أفقي A4):")
+        st.components.v1.html(html_content, height=600, scrolling=True)
 
+        # زر التحميل
         st.download_button(
-            label="⬇️ تحميل الجذاذة النهائية بصيغة HTML (جاهزة للطباعة)",
+            label="⬇️ تحميل الجذاذة كملف HTML (اضغط Ctrl+P واجعله Landscape للطباعة كـ PDF)",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_A4_Perfect.html",
+            file_name="Jadad_Table_Landscape.html",
             mime="html"
-                )
+                                                          )
         
