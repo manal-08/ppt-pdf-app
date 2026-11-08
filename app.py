@@ -1,26 +1,17 @@
 import streamlit as st
 from pptx import Presentation
 import os
-import easyocr
-
-@st.cache_resource
-def load_reader():
-    return easyocr.Reader(['fr', 'en'])
-
-reader = load_reader()
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية الذكي", layout="centered")
-st.title("📚 منصة توليد الجذاذات الرياضية من الباوربوينت")
+st.title("📚 منصة توليد الجذاذات الرياضية الرسمية")
 
-uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت (PPTX)", type=["pptx"])
+uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة وترتيبها"):
-    with st.spinner("جاري استخراج النصوص والمعادلات وتنسيق الجذاذة..."):
+if uploaded_ppt and st.button("توليد الجذاذة بتصميم A4"):
+    with st.spinner("جاري تنسيق الجذاذة بالمقاسات والألوان المطلوبة..."):
         prs = Presentation(uploaded_ppt)
         all_content = []
         
-        os.makedirs("temp_slides_img", exist_ok=True)
-
         for slide_idx, slide in enumerate(prs.slides, start=1):
             all_content.append(("TITLE_SLIDE", f"--- الشريحة رقم {slide_idx} ---"))
             
@@ -30,37 +21,67 @@ if uploaded_ppt and st.button("توليد الجذاذة وترتيبها"):
                         txt = paragraph.text.strip()
                         if txt:
                             all_content.append(("TEXT", txt))
-                
-                elif shape.shape_type == 13:
-                    try:
-                        image_bytes = shape.image.blob
-                        img_path = f"temp_slides_img/slide_{slide_idx}_img.png"
-                        with open(img_path, "wb") as f:
-                            f.write(image_bytes)
-                        
-                        results = reader.readtext(img_path)
-                        for (_, text, _) in results:
-                            if text.strip():
-                                all_content.append(("TEXT", text.strip()))
-                    except Exception:
-                        pass
 
-        # بناء محتوى HTML منسق بالألوان المطلوبة تماماً
+        # تصميم صفحة A4 بيضاء نقية ومنسقة بدقة للطباعة
         html_content = """
-        <div style="font-family: Arial, sans-serif; direction: ltr; padding: 20px; background-color: #fff; color: #000;">
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {
+                    background-color: #555;
+                    margin: 0;
+                    padding: 20px;
+                    display: flex;
+                    justify-content: center;
+                }
+                .a4-page {
+                    background-color: #ffffff;
+                    width: 210mm;
+                    min-height: 297mm;
+                    padding: 20mm;
+                    margin: auto;
+                    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+                    box-sizing: border-box;
+                    font-family: Arial, sans-serif;
+                    direction: ltr;
+                    color: #000000;
+                    font-size: 14px;
+                    line-height: 1.5;
+                }
+                h3.slide-title {
+                    color: #646464;
+                    border-bottom: 1px solid #ddd;
+                    padding-bottom: 4px;
+                    margin-top: 20px;
+                    font-size: 15px;
+                }
+                p.content-line {
+                    margin: 6px 0;
+                }
+                @media print {
+                    body { background: none; padding: 0; }
+                    .a4-page { box-shadow: none; width: 100%; padding: 10mm; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="a4-page">
+                <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Fiche Pédagogique - Mathématiques</h2>
         """
 
         for el_type, text in all_content:
             if el_type == "TITLE_SLIDE":
-                html_content += f"<h3 style='color: #646464; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px;'>{text}</h3>"
+                html_content += f'<h3 class="slide-title">{text}</h3>'
                 continue
 
-            color = "#000000"  # أسود افتراضي
+            color = "#000000"  # الأسود لباقي الفقرات
             weight = "normal"
 
-            # الألوان البيداغوجية حسب طلبك:
+            # تطبيق الألوان البيداغوجية حسب طلبك:
             if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                color = "#C80000"  # أحمر للعناوين الرومانية
+                color = "#C80000"  # أحمر عناوين للأرقام الرومانية
                 weight = "bold"
             elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
                 color = "#008000"  # أخضر للعناوين العادية
@@ -69,29 +90,33 @@ if uploaded_ppt and st.button("توليد الجذاذة وترتيبها"):
                 color = "#800080"  # بنفسجي للقواعد
                 weight = "bold"
             elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                color = "#0066CC"  # أزرق سماوي
+                color = "#0066CC"  # أزرق سماوي للأنشطة والتعريفات والأمثلة
                 weight = "bold"
             elif "Propriété" in text or "Propriete" in text:
                 color = "#FF8000"  # برتقالي للخاصيات
                 weight = "bold"
             elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                color = "#8B4513"  # بني للتطبيقات
+                color = "#8B4513"  # بني للتطبيقات والتمارين
                 weight = "bold"
 
-            html_content += f"<p style='color: {color}; font-weight: {weight}; margin: 5px 0;'>{text}</p>"
+            html_content += f'<p class="content-line" style="color: {color}; font-weight: {weight};">{text}</p>'
 
-        html_content += "</div>"
+        html_content += """
+            </div>
+        </body>
+        </html>
+        """
 
-        st.success("تم توليد الجذاذة بنجاح وبجميع الألوان المطلوبة!")
+        st.success("تم توليد الجذاذة بتصميم A4 والألوان البيداغوجية بنجاح!")
         
-        # عرض الجذاذة مباشرة على الشاشة بشكل جميل
-        st.markdown("### 📄 معاينة الجذاذة النهائية:")
-        st.markdown(html_content, unsafe_allow_html=True)
+        # معاينة الجذاذة داخل الإطار
+        st.markdown("### 📄 معاينة الجذاذة (بمقاسات A4 وخلفية بيضاء):")
+        st.components.v1.html(html_content, height=600, scrolling=True)
 
-        # زر تحميل النتيجة كملف HTML (يمكن فتحه وطباعته كـ PDF من المتصفح مباشرة)
+        # زر التحميل المباشر
         st.download_button(
-            label="⬇️ تحميل الجذاذة كملف (جاهز للطباعة)",
+            label="⬇️ تحميل الجذاذة كملف HTML (اضغط Ctrl+P للطباعة كـ PDF)",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_Mathematiques_Pro.html",
+            file_name="Jadad_A4_Mathematiques.html",
             mime="text/html"
         )
