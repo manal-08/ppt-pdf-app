@@ -4,32 +4,33 @@ import os
 import base64
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
-st.title("📚 صانع الجذاذات الرياضية - تصميم الجدول الأفقي (A4 Landscape)")
+st.title("📚 صانع الجذاذات الرياضية - التقسيم التلقائي للصفحات")
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدول الرسمي"):
-    with st.spinner("جاري بناء الجدول الأفقي وإدراج المحتوى بدقة..."):
+if uploaded_ppt and st.button("توليد الجذاذة بالصفحات المنظمة"):
+    with st.spinner("جاري تحليل الدرس وتوزيعه على صفحات A4 منظمة..."):
         prs = Presentation(uploaded_ppt)
-        slide_contents = []
+        all_elements = []
         
         os.makedirs("extracted_slide_images", exist_ok=True)
         img_counter = 0
 
         for slide_idx, slide in enumerate(prs.slides, start=1):
-            slide_elements = []
-            
             for shape in slide.shapes:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
                         txt = paragraph.text.strip()
                         if txt:
-                            slide_elements.append(("TEXT", txt))
+                            all_elements.append(("TEXT", txt))
                 
                 elif shape.shape_type == 13:
                     try:
-                        img_counter += 1
                         image_bytes = shape.image.blob
+                        if len(image_bytes) < 3000:
+                            continue
+                            
+                        img_counter += 1
                         img_filename = f"extracted_slide_images/slide_{slide_idx}_img_{img_counter}.png"
                         with open(img_filename, "wb") as f:
                             f.write(image_bytes)
@@ -38,13 +39,11 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                             encoded_img = base64.b64encode(img_file.read()).decode('utf-8')
                         img_tag = f"data:image/png;base64,{encoded_img}"
                         
-                        slide_elements.append(("IMAGE", img_tag))
+                        all_elements.append(("IMAGE", img_tag))
                     except Exception:
                         pass
-            
-            slide_contents.append(slide_elements)
 
-        # تصميم الجدول الأفقي A4 Landscape بدون عبارات الشرائح
+        # تصميم جدول أفقي مع تقسيم تلقائي للأسطر على صفحات متعددة عند الطباعة
         html_content = """
         <!DOCTYPE html>
         <html lang="fr">
@@ -53,7 +52,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
             <style>
                 @page {
                     size: A4 landscape;
-                    margin: 5mm;
+                    margin: 10mm;
                 }
                 body {
                     background-color: #555;
@@ -62,18 +61,19 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                     display: flex;
                     justify-content: center;
                 }
-                .a4-landscape {
+                .a4-page {
                     background-color: #ffffff;
                     width: 297mm;
                     min-height: 210mm;
                     padding: 10mm;
-                    margin: auto;
+                    margin: 10px auto;
                     box-shadow: 0 0 10px rgba(0,0,0,0.3);
                     box-sizing: border-box;
                     font-family: Arial, sans-serif;
                     direction: ltr;
                     color: #000000;
                     font-size: 13px;
+                    page-break-after: always; /* فصل الصفحات تلقائياً */
                 }
                 table.fiche-table {
                     width: 100%;
@@ -105,7 +105,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                     line-height: 1.4;
                 }
                 .slide-image {
-                    max-width: 45%;
+                    max-width: 40%;
                     height: auto;
                     display: block;
                     margin: 8px auto;
@@ -116,12 +116,22 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                 }
                 @media print {
                     body { background: none; padding: 0; }
-                    .a4-landscape { box-shadow: none; width: 100%; padding: 0; }
+                    .a4-page { box-shadow: none; margin: 0; page-break-after: always; }
                 }
             </style>
         </head>
         <body>
-            <div class="a4-landscape">
+        """
+
+        # تقسيم المحتوى إلى أجزاء (مثلاً كل 12 عنصراً في صفحة لضمان عدم الاكتظاظ)
+        chunk_size = 12
+        chunks = [all_elements[i:i + chunk_size] for i in range(0, len(all_elements), chunk_size)]
+        if not chunks:
+            chunks = [[]]
+
+        for chunk in chunks:
+            html_content += """
+            <div class="a4-page">
                 <table class="fiche-table">
                     <thead>
                         <tr>
@@ -138,11 +148,9 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                             <td class="col-seance"></td>
                             <td class="col-duree"></td>
                             <td class="col-contenu">
-        """
+            """
 
-        # إدراج النصوص والصور مباشرة بدون عناوين الشرائح
-        for slide_elements in slide_contents:
-            for el_type, text_or_img in slide_elements:
+            for el_type, text_or_img in chunk:
                 if el_type == "IMAGE":
                     html_content += f'<img src="{text_or_img}" class="slide-image">'
                     continue
@@ -151,29 +159,28 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                 color = "#000000"
                 weight = "normal"
 
-                # الألوان البيداغوجية الدقيقة حسب طلبك:
                 if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                    color = "#C80000"  # أحمر للأرقام الرومانية
+                    color = "#C80000"
                     weight = "bold"
                 elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                    color = "#008000"  # أخضر للعناوين العادية
+                    color = "#008000"
                     weight = "bold"
                 elif "Règle" in text or "Regle" in text:
-                    color = "#800080"  # بنفسجي للقواعد
+                    color = "#800080"
                     weight = "bold"
                 elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                    color = "#0066CC"  # أزرق سماوي للأنشطة والتعريفات والأمثلة
+                    color = "#0066CC"
                     weight = "bold"
                 elif "Propriété" in text or "Propriete" in text:
-                    color = "#FF8000"  # برتقالي للخاصيات
+                    color = "#FF8000"
                     weight = "bold"
                 elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                    color = "#8B4513"  # بني للتطبيقات والتمارين
+                    color = "#8B4513"
                     weight = "bold"
 
                 html_content += f'<div class="content-line" style="color: {color}; font-weight: {weight};">{text}</div>'
 
-        html_content += """
+            html_content += """
                             </td>
                             <td class="col-ens"></td>
                             <td class="col-app"></td>
@@ -182,19 +189,22 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                     </tbody>
                 </table>
             </div>
+            """
+
+        html_content += """
         </body>
         </html>
         """
 
-        st.success("تم توليد الجذاذة بنجاح وبدون إظهار أرقام الشرائح!")
+        st.success("تم توزيع الجذاذة وتنسيقها على صفحات A4 متسلسلة بنجاح!")
         
         st.markdown("### 📄 معاينة الجذاذة النهائية:")
-        st.components.v1.html(html_content, height=600, scrolling=True)
+        st.components.v1.html(html_content, height=700, scrolling=True)
 
         st.download_button(
-            label="⬇️ تحميل الجذاذة كملف HTML (اضغط Ctrl+P واجعله Landscape للطباعة كـ PDF)",
+            label="⬇️ تحميل الجذاذة كملف HTML (جاهز للطباعة وتوزيعه على صفحات PDF)",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_Table_Landscape.html",
+            file_name="Jadad_Multi_Pages.html",
             mime="html"
-                    )
-        
+                            )
+                
