@@ -2,72 +2,75 @@ import streamlit as st
 from pptx import Presentation
 import os
 import base64
-from PIL import Image, ImageOps
+from PIL import Image
 import io
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
-st.title("📚 صانع الجذاذات - قص الإطار المزخرف وتبييض خلفية الشريحة بالكامل")
+
+st.title("📚 صانع الجذاذات - القص الدقيق للإطار وتحويل الشرائح لـ PDF")
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-def process_full_slide_image(image_bytes):
-    """ أخذ الشريحة كاملة، قص جوانبها المزخرفة، وجعل خلفيتها بيضاء نقية """
+# زر لإتاحة تعديل نسبة قص الهامش المزخرف إن أردتِ التحكم فيها
+crop_ratio = st.slider("نسبة قص الإطار المزخرف من الجوانب (%)", min_value=0, max_value=20, value=9)
+
+def process_slide_to_clean_image(image_bytes, crop_pct):
+    """ أخذ صورة الشريحة، قص الجوانب المزخرفة، والحفاظ على معادلات الدرس """
     try:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
 
-        # قص الجوانب والأطراف المزخرفة (حذف الهوامش الخارجية التي تحتوي على الإطار المزخرف)
-        # يمكنك تعديل النسبة إن احتجتِ لزيادة أو تقليل القص من الجوانب
-        left = int(w * 0.08)
-        top = int(h * 0.08)
-        right = int(w * 0.92)
-        bottom = int(h * 0.92)
-        
+        # حساب هوامش القص المستطيلي بحسب النسبة
+        left = int(w * (crop_pct / 100.0))
+        top = int(h * (crop_pct / 100.0))
+        right = int(w * (1.0 - (crop_pct / 100.0)))
+        bottom = int(h * (1.0 - (crop_pct / 100.0)))
+
+        # قص المستطيل الخارجي وتصليح الخلفية
         cropped_img = img.crop((left, top, right, bottom))
         
-        # تحويل الخلفية إلى بيضاء ناصعة (تبييض أي لون خلفية باهت أو ملون)
-        # نجعل الألوان الفاتحة جداً أو الملونة خلفية بيضاء خالصة ونحافظ على نص الدرس والمعادلات
+        # تنقية الألوان الفاتحة وتوحيد الخلفية البيضاء
         data = cropped_img.getdata()
         new_data = []
         for item in data:
-            # إذا كان اللون قريباً جداً من الأبيض أو خلفية ملونة فاتحة للقالب، نحوله إلى أبيض ناصع
+            # الألوان القريبة جداً من الأبيض تتحول لأبيض ناصع مع الحفاظ على النص والمعادلات
             if item[0] > 220 and item[1] > 220 and item[2] > 220:
                 new_data.append((255, 255, 255))
             else:
                 new_data.append(item)
-        
         cropped_img.putdata(new_data)
 
         buffer = io.BytesIO()
         cropped_img.save(buffer, format="PNG")
-        encoded_img = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return f"data:image/png;base64,{encoded_img}"
+        encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{encoded}"
     except Exception:
         return None
 
-if uploaded_ppt and st.button("توليد الجذاذة (قص الجوانب + خلفية بيضاء + شريحتان)"):
-    with st.spinner("جاري معالجة الشرائح، قص الجوانب، وتبييض الخلفيات..."):
+# الزر المطلوب لتوليد الجذاذة فور رفع الملف
+if uploaded_ppt and st.button("🚀 صنع الجذاذة (قص الإطار المزخرف + شريحتين بالصفحة)"):
+    with st.spinner("جاري قص إطار الزينة وتنسيق شرائح الدرس..."):
         prs = Presentation(uploaded_ppt)
-        clean_slide_images = []
+        clean_slides = []
 
-        for slide_idx, slide in enumerate(prs.slides, start=1):
+        for slide in prs.slides:
             slide_shapes_bytes = []
             for shape in slide.shapes:
-                if shape.shape_type == 13: # صور أو كتل مرسومة داخل الشريحة
+                if shape.shape_type == 13: # صورة الشريحة أو العناصر
                     try:
                         slide_shapes_bytes.append(shape.image.blob)
                     except Exception:
                         pass
             
             if slide_shapes_bytes:
-                # أخذ أكبر صورة تمثل محتوى الشريحة بالكامل وتطبيق القص وتبييض الخلفية
-                main_slide_bytes = max(slide_shapes_bytes, key=len)
-                processed_img = process_full_slide_image(main_slide_bytes)
-                if processed_img:
-                    clean_slide_images.append(processed_img)
+                # أخذ الصورة الرئيسية المقابلة للشريحة
+                main_bytes = max(slide_shapes_bytes, key=len)
+                cleaned_img = process_slide_to_clean_image(main_bytes, crop_ratio)
+                if cleaned_img:
+                    clean_slides.append(cleaned_img)
 
-        # ترتيب كل شريحتين معاً في صفحة واحدة
-        paired_slides = [clean_slide_images[i:i + 2] for i in range(0, len(clean_slide_images), 2)]
+        # دمج كل شريحتين متتاليتين في صفحة A4 واحدة
+        paired_slides = [clean_slides[i:i + 2] for i in range(0, len(clean_slides), 2)]
 
         html_content = """
         <!DOCTYPE html>
@@ -85,7 +88,7 @@ if uploaded_ppt and st.button("توليد الجذاذة (قص الجوانب + 
                     padding: 10px;
                     font-family: Arial, sans-serif;
                     direction: ltr;
-                    color: #000000;
+                    color: #000;
                 }
                 .print-bar {
                     text-align: center;
@@ -204,12 +207,12 @@ if uploaded_ppt and st.button("توليد الجذاذة (قص الجوانب + 
         </html>
         """
 
-        st.success("تم قص الجوانب، تبييض الخلفية، وتنسيق شريحتين لكل صفحة بنجاح!")
+        st.success("تم توليد الجذاذة بنجاح! اضغطي على زر حفظ PDF بالأسفل.")
         st.components.v1.html(html_content, height=680, scrolling=True)
 
         st.download_button(
             label="⬇️ تحميل الجذاذة (HTML جاهز للحفظ كـ PDF)",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_Final_Clean.html",
+            file_name="Jadada_Math_Final.html",
             mime="html"
         )
