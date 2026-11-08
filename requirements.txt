@@ -1,4 +1,4 @@
-
+pip install streamlit PyMuPDF python-pptx Pillow
 streamlit
 python-pptx
 fpdf2
