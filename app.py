@@ -11,19 +11,18 @@ st.markdown("---")
 uploaded_file = st.file_uploader("📥 ارفع ملف الباوربوينت (PPTX):", type=["pptx"])
 
 if uploaded_file:
-    # قراءة الشرائح واستخراج صور الأشكال الموجودة فيها لتعرض للمعاينة
     image_bytes = None
     try:
         prs = Presentation(uploaded_file)
         for slide in prs.slides:
             for shape in slide.shapes:
-                if shape.shape_type == 13: # صورة داخل الشريحة
+                if shape.shape_type == 13:  # صورة داخل الشريحة
                     image_bytes = shape.image.blob
                     break
             if image_bytes:
                 break
     except Exception as e:
-        st.error(fحدث خطأ أثناء قراءة الملف: {e}")
+        st.error(f"حدث خطأ أثناء قراءة الملف: {e}")
 
     if image_bytes:
         original_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -50,7 +49,7 @@ if uploaded_file:
         st.markdown("### 👀 معاينة مباشرة لما بعد القص:")
         st.image(cropped_img, caption="هكذا ستظهر الشريحة بعد إزالة الإطار المزخرف", use_column_width=True)
         
-        st.success("✅ الآن تظهر لكِ المعاينة مباشرة! حركي المؤشرات للأعلى لتجربة القص بدقة، وعندما تضبط معكِ، أخبريني لنعتمد هذه القيم وننتقل للخطوة النهائية!")
+        st.success("✅ الآن تظهر لكِ المعاينة مباشرة! حركي المؤشرات بالأعلى لتجربة القص بدقة، وعندما تضبط معكِ، أخبريني لنعتمد هذه القيم!")
     else:
         st.warning("⚠️ لم يتم العثور على صورة داخل الشرائح. يرجى التأكد من أن ملف الـ PPTX يحتوي على خلفية أو صور شرائح.")
         
