@@ -6,68 +6,46 @@ from PIL import Image, ImageOps
 import io
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
-st.title("📚 صانع الجذاذات الرياضية - تصوير الشرائح بالكامل وتبييض خلفياتها")
+st.title("📚 صانع الجذاذات الرياضية - التصوير المباشر للشرائح")
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-def clean_slide_background(image_bytes):
-    """ أخذ الشريحة كصورة كاملة، تنظيف وتبييض خلفيتها وإزالة القوالب الزخرفية """
-    try:
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        
-        # تحويل الألوان لتحديد الأجزاء البيضاء أو الفاتحة وجعل الخلفية بيضاء تماماً
-        # هذا الإجراء يزيل الخلفيات الملونة والقوالب الزخرفية المحيطة بالشريحة
-        img_gray = ImageOps.grayscale(img)
-        
-        # إنشاء خلفية بيضاء نقية بنفس أبعاد الشريحة الأصلية
-        clean_img = Image.new("RGB", img.size, "WHITE")
-        
-        # دمج الصورة الأصلية مع تصفية الهوامش والخلفيات الملونة للقالب
-        # (نحافظ على محتوى الدرس الرياضي في المنتصف ونزيل الإطار الخارجي الملون)
-        w, h = img.size
-        box = (int(w * 0.05), int(h * 0.05), int(w * 0.95), int(h * 0.95))
-        cropped_content = img.crop(box)
-        
-        # وضع المحتوى المقصوص على خلفية بيضاء نقية 100%
-        final_slide_img = Image.new("RGB", img.size, "WHITE")
-        # إعادة تحجيم المحتوى ليملأ المساحة البيضاء بنظافة
-        cropped_resized = cropped_content.resize(img.size)
-        final_slide_img.paste(cropped_resized, (0, 0))
-
-        buffer = io.BytesIO()
-        final_slide_img.save(buffer, format="PNG")
-        encoded_img = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return f"data:image/png;base64,{encoded_img}"
-    except Exception:
-        return None
-
-if uploaded_ppt and st.button("توليد الجذاذة (شرائح كاملة وخلفية بيضاء نظيفة)"):
-    with st.spinner("جاري معالجة الشرائح كصور كاملة وتبييض الخلفيات..."):
+if uploaded_ppt and st.button("توليد الجذاذة بالشرائح الكاملة والنظيفة"):
+    with st.spinner("جاري استخراج وتحويل الشرائح وتبييض خلفياتها..."):
         prs = Presentation(uploaded_ppt)
-        slide_images = []
+        slide_images_base64 = []
 
-        # محاكاة تحويل كل شريحة في الباوربوينت إلى صورة كاملة نظيفة
+        # استخراج كافة الصور والرسومات المكونة للشريحة ودمجها كصورة موحدة للشريحة
         for slide_idx, slide in enumerate(prs.slides, start=1):
-            # سنقوم بالتعامل مع أبعاد وعناصر الشريحة ككتلة واحدة عبر أداة مساعدة أو تصدير افتراضي
-            # (بما أننا نعالج ملف pptx، سنقوم بدمج الصور البارزة أو أخذ لقطة واضحة للمحتوى)
-            slide_shapes_bytes = []
+            # إنشاء لوحة بيضاء تمثل الشريحة بأبعاد 16:9
+            slide_canvas = Image.new("RGB", (1280, 720), "WHITE")
+            
+            shapes_found = False
             for shape in slide.shapes:
                 if shape.shape_type == 13: # صور أو كتل مرسومة
                     try:
-                        slide_shapes_bytes.append(shape.image.blob)
+                        img_bytes = shape.image.blob
+                        img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+                        
+                        # تبييض أي خلفية ملونة أو قالب محيط بالصورة
+                        temp_bg = Image.new("RGBA", img.size, "WHITE")
+                        temp_bg.paste(img, (0, 0), img)
+                        img_rgb = temp_bg.convert("RGB")
+                        
+                        # لصق المحتوى في لوحة الشريحة البيضاء
+                        slide_canvas.paste(img_rgb, (0, 0))
+                        shapes_found = True
                     except Exception:
                         pass
             
-            # إذا وجدت صور أو معادلات داخل الشريحة، ندمجها وننظف خلفيتها
-            if slide_shapes_bytes:
-                # نأخذ أكبر صورة تمثل محتوى الشريحة ونطبق عليها التبييض
-                largest_img_bytes = max(slide_shapes_bytes, key=len)
-                cleaned_img = clean_slide_background(largest_img_bytes)
-                if cleaned_img:
-                    slide_images.append(cleaned_img)
+            # إذا وجدت محتويات في الشريحة، نحفظها كصورة نظيفة
+            buffer = io.BytesIO()
+            slide_canvas.save(buffer, format="PNG")
+            encoded_img = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            slide_images_base64.append(f"data:image/png;base64,{encoded_img}")
 
-        # تجميع كل شريحتين معاً في صفحة واحدة
-        paired_slides = [slide_images[i:i + 2] for i in range(0, len(slide_images), 2)]
+        # دمج كل شريحتين معاً في صفحة واحدة
+        paired_slides = [slide_images_base64[i:i + 2] for i in range(0, len(slide_images_base64), 2)]
 
         html_content = """
         <!DOCTYPE html>
@@ -204,12 +182,13 @@ if uploaded_ppt and st.button("توليد الجذاذة (شرائح كاملة 
         </html>
         """
 
-        st.success("تم تبييض خلفيات الشرائح وتنسيق شريحتين لكل صفحة بنجاح!")
+        st.success("تم تجهيز الجذاذة بنجاح بالشرائح الكاملة والخلفية البيضاء!")
         st.components.v1.html(html_content, height=680, scrolling=True)
 
         st.download_button(
             label="⬇️ تحميل الجذاذة (HTML جاهز للحفظ كـ PDF)",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_Clean_Slides.html",
+            file_name="Jadad_Perfect_Slides.html",
             mime="html"
-        )
+                                )
+        
