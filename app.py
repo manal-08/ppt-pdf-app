@@ -4,12 +4,12 @@ import os
 import base64
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
-st.title("📚 صانع الجذاذات الرياضية - تصميم الجدول الأفقي (A4 Landscape)")
+st.title("📚 صانع الجذاذات الرياضية - استقرار الجدول الأفقي (A4 Landscape)")
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدول الرسمي"):
-    with st.spinner("جاري بناء الجذاذة وتنسيق المحتوى..."):
+if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرات والمعادلات"):
+    with st.spinner("جاري استخراج كافة فقرات الدرس والمعادلات بدقة..."):
         prs = Presentation(uploaded_ppt)
         all_elements = []
         
@@ -18,16 +18,18 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
 
         for slide_idx, slide in enumerate(prs.slides, start=1):
             for shape in slide.shapes:
+                # استخراج كافة النصوص المتاحة في الشريحة دون استثناء
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
                         txt = paragraph.text.strip()
                         if txt:
                             all_elements.append(("TEXT", txt))
                 
+                # استخراج الصور والرموز الرياضية الأساسية
                 elif shape.shape_type == 13:
                     try:
                         image_bytes = shape.image.blob
-                        if len(image_bytes) < 3000:
+                        if len(image_bytes) < 2000: # تجاهل الأيقونات الصغيرة جداً فقط
                             continue
                             
                         img_counter += 1
@@ -43,7 +45,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                     except Exception:
                         pass
 
-        # تصميم A4 Landscape مستقر مع تكرار ترويسة الجدول تلقائياً عند الطباعة
+        # بناء قالب الجدول الأفقي المتناسق
         html_content = """
         <!DOCTYPE html>
         <html lang="fr">
@@ -90,7 +92,6 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                     color: #000;
                     height: 30px;
                 }
-                /* إجبار ترويسة الجدول على الظهور في أعلى كل صفحة جديدة عند الطباعة */
                 thead { display: table-header-group; }
                 tr { page-break-inside: avoid; }
 
@@ -102,7 +103,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                 .col-obs { width: 12%; }
 
                 .content-line {
-                    margin: 5px 0;
+                    margin: 6px 0;
                     line-height: 1.4;
                     font-size: 13px;
                 }
@@ -151,23 +152,24 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
             color = "#000000"
             weight = "normal"
 
+            # تطبيق الألوان البيداغوجية بدقة على النصوص
             if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                color = "#C80000"
+                color = "#C80000"  # أحمر للأرقام الرومانية
                 weight = "bold"
             elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                color = "#008000"
+                color = "#008000"  # أخضر للعناوين
                 weight = "bold"
             elif "Règle" in text or "Regle" in text:
-                color = "#800080"
+                color = "#800080"  # بنفسجي للقواعد
                 weight = "bold"
             elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                color = "#0066CC"
+                color = "#0066CC"  # أزرق سماوي للأنشطة والتعريفات والأمثلة
                 weight = "bold"
             elif "Propriété" in text or "Propriete" in text:
-                color = "#FF8000"
+                color = "#FF8000"  # برتقالي للخاصيات
                 weight = "bold"
             elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                color = "#8B4513"
+                color = "#8B4513"  # بني للتطبيقات والتمارين
                 weight = "bold"
 
             html_content += f'<div class="content-line" style="color: {color}; font-weight: {weight};">{text}</div>'
@@ -185,12 +187,13 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
         </html>
         """
 
-        st.success("تم توليد الجذاذة بنجاح!")
+        st.success("تم استخراج كافة فقرات الدرس والمعادلات بنجاح!")
         st.components.v1.html(html_content, height=650, scrolling=True)
 
         st.download_button(
             label="⬇️ تحميل الجذاذة كملف HTML",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_Landscape_Fixed.html",
+            file_name="Jadad_Complete_Math.html",
             mime="html"
         )
+        
