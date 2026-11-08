@@ -9,7 +9,7 @@ st.title("📚 صانع الجذاذات الرياضية - تصميم الجد�
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
 if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدول الرسمي"):
-    with st.spinner("جاري بناء الجدول الأفقي وإدراج النصوص والصور..."):
+    with st.spinner("جاري بناء الجدول الأفقي وإدراج المحتوى بدقة..."):
         prs = Presentation(uploaded_ppt)
         slide_contents = []
         
@@ -18,7 +18,6 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
 
         for slide_idx, slide in enumerate(prs.slides, start=1):
             slide_elements = []
-            slide_elements.append(("TITLE", f"--- الشريحة رقم {slide_idx} ---"))
             
             for shape in slide.shapes:
                 if shape.has_text_frame:
@@ -45,7 +44,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
             
             slide_contents.append(slide_elements)
 
-        # تصميم الجدول الأفقي A4 Landscape المطابق تماماً للنموذج الرسمي
+        # تصميم الجدول الأفقي A4 Landscape بدون عبارات الشرائح
         html_content = """
         <!DOCTYPE html>
         <html lang="fr">
@@ -94,7 +93,6 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                     font-weight: bold;
                     color: #333;
                 }
-                /* عرض الأعمدة الرسمية للجذاذة */
                 .col-seance { width: 7%; text-align: center; }
                 .col-duree { width: 7%; text-align: center; }
                 .col-contenu { width: 52%; }
@@ -102,16 +100,8 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                 .col-app { width: 11%; }
                 .col-obs { width: 12%; }
 
-                .slide-title {
-                    color: #646464;
-                    border-bottom: 1px solid #ccc;
-                    padding-bottom: 3px;
-                    margin-top: 15px;
-                    font-size: 13px;
-                    font-weight: bold;
-                }
                 .content-line {
-                    margin: 5px 0;
+                    margin: 6px 0;
                     line-height: 1.4;
                 }
                 .slide-image {
@@ -150,13 +140,9 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                             <td class="col-contenu">
         """
 
-        # إدراج المحتوى داخل خلية Contenu بالترتيب والألوان الدقيقة
+        # إدراج النصوص والصور مباشرة بدون عناوين الشرائح
         for slide_elements in slide_contents:
             for el_type, text_or_img in slide_elements:
-                if el_type == "TITLE":
-                    html_content += f'<div class="slide-title">{text_or_img}</div>'
-                    continue
-                
                 if el_type == "IMAGE":
                     html_content += f'<img src="{text_or_img}" class="slide-image">'
                     continue
@@ -165,9 +151,9 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
                 color = "#000000"
                 weight = "normal"
 
-                # الألوان البيداغوجية حسب طلبك الدقيق:
+                # الألوان البيداغوجية الدقيقة حسب طلبك:
                 if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                    color = "#C80000"  # أحمر عناوين للأرقام الرومانية
+                    color = "#C80000"  # أحمر للأرقام الرومانية
                     weight = "bold"
                 elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
                     color = "#008000"  # أخضر للعناوين العادية
@@ -200,17 +186,15 @@ if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدو
         </html>
         """
 
-        st.success("تم توليد الجذاذة بتصميم الجدول الأفقي الرسمي بنجاح!")
+        st.success("تم توليد الجذاذة بنجاح وبدون إظهار أرقام الشرائح!")
         
-        # معاينة الجذاذة
-        st.markdown("### 📄 معاينة الجذاذة (تصميم جدول أفقي A4):")
+        st.markdown("### 📄 معاينة الجذاذة النهائية:")
         st.components.v1.html(html_content, height=600, scrolling=True)
 
-        # زر التحميل
         st.download_button(
             label="⬇️ تحميل الجذاذة كملف HTML (اضغط Ctrl+P واجعله Landscape للطباعة كـ PDF)",
             data=html_content.encode('utf-8'),
             file_name="Jadad_Table_Landscape.html",
             mime="html"
-                                                          )
+                    )
         
