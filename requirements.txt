@@ -1,7 +1,8 @@
-pip install streamlit PyMuPDF python-pptx Pillow
-streamlit
+ streamlit
+PyMuPDF
 python-pptx
-fpdf2
 Pillow
+streamlit
+fpdf2
 easyocr
 numpy
