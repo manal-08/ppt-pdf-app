@@ -30,8 +30,18 @@ with tab1:
         pdf.set_font("Helvetica", size=10)
         
         for line in text_runs:
-            safe_line = line.encode('latin-1', 'replace').decode('latin-1')
-            pdf.multi_cell(0, 8, txt=safe_line)
+            # تقطيع الأسطر الطويلة جداً لتجنب خطأ المساحة الأفقية
+            words = line.split()
+            current_line = ""
+            for word in words:
+                safe_word = word.encode('latin-1', 'replace').decode('latin-1')
+                if pdf.get_string_width(current_line + " " + safe_word) < 180:
+                    current_line += (" " + safe_word) if current_line else safe_word
+                else:
+                    pdf.multi_cell(0, 8, txt=current_line)
+                    current_line = safe_word
+            if current_line:
+                pdf.multi_cell(0, 8, txt=current_line)
         
         pdf_output = pdf.output()
         
