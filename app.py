@@ -11,7 +11,6 @@ st.set_page_config(page_title="صانع الجذاذات الرياضية الم
 st.title("📚 صانع الجذاذات الرياضية - النظام ذو الزرين المنفصلين")
 st.markdown("---")
 
-# تبويب أو خيارين للعملية بوضوح
 tab1, tab2 = st.tabs(["الخطوة 1: تحويل وتجميع العرض كصور", "الخطوة 2: صنع الجذاذة PDF الرسمية"])
 
 # -------------------------------------------------------------
@@ -41,16 +40,13 @@ with tab1:
                             pass
                 
                 if slide_shapes_bytes:
-                    # أخذ الشريحة بالكامل كما هي دون قص
                     full_slide_blob = max(slide_shapes_bytes, key=len)
                     extracted_images.append(full_slide_blob)
                     
-                    # إضافتها للشريحة الجديدة في العرض الجديد
                     new_slide = new_prs.slides.add_slide(blank_layout)
                     image_stream = io.BytesIO(full_slide_blob)
                     new_slide.shapes.add_picture(image_stream, 0, 0, width=new_prs.slide_width, height=new_prs.slide_height)
 
-            # حفظ العرض الجديد في الذاكرة لتنزيله
             output_stream = io.BytesIO()
             new_prs.save(output_stream)
             new_pptx_data = output_stream.getvalue()
@@ -71,7 +67,6 @@ with tab2:
     st.subheader("📄 المرحلة الثانية: صنع الجذاذة الرسمية من العرض الجديد")
     uploaded_ppt_step2 = st.file_uploader("📥 ارفع العرض التقديمي الجديد (الذي قمت بتحميله في الخطوة الأولى):", type=["pptx"], key="step2_file")
     
-    # شريط التحكم لقص الهوامش وإزالة القوالب الزخرفية الخلفية
     crop_margin = st.slider("✂️ نسبة إزالة الإطار المزخرف والخلفية من الأطراف (%):", min_value=0, max_value=25, value=8, key="step2_slider")
 
     if uploaded_ppt_step2 and st.button("🚀 صنع الجذاذة PDF (شريحتان بالصفحة)"):
@@ -94,7 +89,6 @@ with tab2:
                         img = Image.open(io.BytesIO(blob)).convert("RGB")
                         w, h = img.size
 
-                        # إزالة القالب والخلفية المزخرفة عبر قص الأطراف والتركيز على المحتوى الداخلي (المعادلات والنصوص)
                         left = int(w * (crop_margin / 100.0))
                         top = int(h * (crop_margin / 100.0))
                         right = int(w * (1 - crop_margin / 100.0))
@@ -112,7 +106,6 @@ with tab2:
             if not clean_slides_b64:
                 st.error("لم يتم العثور على شرائح معالجة. تأكدي من رفع الملف الصحيح.")
             else:
-                # تجميع كل شريحتين معاً في صفحة أفقية A4 واحدة
                 paired_slides = [clean_slides_b64[i:i + 2] for i in range(0, len(clean_slides_b64), 2)]
 
                 html_content = """
@@ -213,7 +206,7 @@ with tab2:
                     <div class="page-card">
                         <table class="fiche-table">
                             <thead>
-                                r>
+                                <tr>
                                     <th class="col-seance">Séance</th>
                                     <th class="col-duree">Durée</th>
                                     <th class="col-contenu">Contenu (Page {page_idx})</th>
@@ -255,27 +248,5 @@ with tab2:
                     data=html_content.encode('utf-8'),
                     file_name="Jadada_Fiche_Pedagogique.html",
                     mime="html"
-                )
-
-                            </td>
-                            <td class="col-ens"></td>
-                            <td class="col-app"></td>
-                            <td class="col-obs"></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            """
-
-        html_content += "</body></html>"
-
-        st.success("✨ تم إنشاء الجذاذة الرسمية بنجاح!")
-        st.components.v1.html(html_content, height=680, scrolling=True)
-
-        st.download_button(
-            label="⬇️ تحميل الجذاذة (HTML جاهز للحفظ كـ PDF)",
-            data=html_content.encode('utf-8'),
-            file_name="Jadada_Math_Final.html",
-            mime="html"
-            )
-        
+)
+                    
