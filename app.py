@@ -4,12 +4,12 @@ import os
 import base64
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
-st.title("📚 صانع الجذاذات الرياضية - التقسيم التلقائي للصفحات")
+st.title("📚 صانع الجذاذات الرياضية - تصميم الجدول الأفقي (A4 Landscape)")
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة بالصفحات المنظمة"):
-    with st.spinner("جاري تحليل الدرس وتوزيعه على صفحات A4 منظمة..."):
+if uploaded_ppt and st.button("توليد الجذاذة بتصميم الجدول الرسمي"):
+    with st.spinner("جاري بناء الجذاذة وتنسيق المحتوى..."):
         prs = Presentation(uploaded_ppt)
         all_elements = []
         
@@ -43,7 +43,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بالصفحات الم
                     except Exception:
                         pass
 
-        # تصميم جدول أفقي مع تقسيم تلقائي للأسطر على صفحات متعددة عند الطباعة
+        # تصميم A4 Landscape مستقر مع تكرار ترويسة الجدول تلقائياً عند الطباعة
         html_content = """
         <!DOCTYPE html>
         <html lang="fr">
@@ -55,57 +55,59 @@ if uploaded_ppt and st.button("توليد الجذاذة بالصفحات الم
                     margin: 10mm;
                 }
                 body {
-                    background-color: #555;
+                    background-color: #f0f0f0;
                     margin: 0;
-                    padding: 10px;
-                    display: flex;
-                    justify-content: center;
-                }
-                .a4-page {
-                    background-color: #ffffff;
-                    width: 297mm;
-                    min-height: 210mm;
-                    padding: 10mm;
-                    margin: 10px auto;
-                    box-shadow: 0 0 10px rgba(0,0,0,0.3);
-                    box-sizing: border-box;
+                    padding: 20px;
                     font-family: Arial, sans-serif;
                     direction: ltr;
                     color: #000000;
-                    font-size: 13px;
-                    page-break-after: always; /* فصل الصفحات تلقائياً */
+                }
+                .page-container {
+                    background-color: #ffffff;
+                    width: 100%;
+                    max-width: 280mm;
+                    margin: 0 auto;
+                    padding: 15mm;
+                    box-sizing: border-box;
+                    box-shadow: 0 0 10px rgba(0,0,0,0.15);
                 }
                 table.fiche-table {
                     width: 100%;
                     border-collapse: collapse;
-                    table-layout: fixed;
                 }
                 table.fiche-table th, table.fiche-table td {
                     border: 1px solid #000000;
                     padding: 8px;
                     vertical-align: top;
                     box-sizing: border-box;
+                    word-wrap: break-word;
                 }
                 table.fiche-table th {
                     background-color: #f2f2f2;
                     text-align: center;
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: bold;
-                    color: #333;
+                    color: #000;
+                    height: 30px;
                 }
-                .col-seance { width: 7%; text-align: center; }
-                .col-duree { width: 7%; text-align: center; }
-                .col-contenu { width: 52%; }
-                .col-ens { width: 11%; }
-                .col-app { width: 11%; }
+                /* إجبار ترويسة الجدول على الظهور في أعلى كل صفحة جديدة عند الطباعة */
+                thead { display: table-header-group; }
+                tr { page-break-inside: avoid; }
+
+                .col-seance { width: 6%; text-align: center; }
+                .col-duree { width: 6%; text-align: center; }
+                .col-contenu { width: 56%; }
+                .col-ens { width: 10%; }
+                .col-app { width: 10%; }
                 .col-obs { width: 12%; }
 
                 .content-line {
-                    margin: 6px 0;
+                    margin: 5px 0;
                     line-height: 1.4;
+                    font-size: 13px;
                 }
                 .slide-image {
-                    max-width: 40%;
+                    max-width: 45%;
                     height: auto;
                     display: block;
                     margin: 8px auto;
@@ -116,22 +118,12 @@ if uploaded_ppt and st.button("توليد الجذاذة بالصفحات الم
                 }
                 @media print {
                     body { background: none; padding: 0; }
-                    .a4-page { box-shadow: none; margin: 0; page-break-after: always; }
+                    .page-container { box-shadow: none; max-width: 100%; padding: 0; }
                 }
             </style>
         </head>
         <body>
-        """
-
-        # تقسيم المحتوى إلى أجزاء (مثلاً كل 12 عنصراً في صفحة لضمان عدم الاكتظاظ)
-        chunk_size = 12
-        chunks = [all_elements[i:i + chunk_size] for i in range(0, len(all_elements), chunk_size)]
-        if not chunks:
-            chunks = [[]]
-
-        for chunk in chunks:
-            html_content += """
-            <div class="a4-page">
+            <div class="page-container">
                 <table class="fiche-table">
                     <thead>
                         <tr>
@@ -148,39 +140,39 @@ if uploaded_ppt and st.button("توليد الجذاذة بالصفحات الم
                             <td class="col-seance"></td>
                             <td class="col-duree"></td>
                             <td class="col-contenu">
-            """
+        """
 
-            for el_type, text_or_img in chunk:
-                if el_type == "IMAGE":
-                    html_content += f'<img src="{text_or_img}" class="slide-image">'
-                    continue
+        for el_type, text_or_img in all_elements:
+            if el_type == "IMAGE":
+                html_content += f'<img src="{text_or_img}" class="slide-image">'
+                continue
 
-                text = text_or_img
-                color = "#000000"
-                weight = "normal"
+            text = text_or_img
+            color = "#000000"
+            weight = "normal"
 
-                if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                    color = "#C80000"
-                    weight = "bold"
-                elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                    color = "#008000"
-                    weight = "bold"
-                elif "Règle" in text or "Regle" in text:
-                    color = "#800080"
-                    weight = "bold"
-                elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                    color = "#0066CC"
-                    weight = "bold"
-                elif "Propriété" in text or "Propriete" in text:
-                    color = "#FF8000"
-                    weight = "bold"
-                elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                    color = "#8B4513"
-                    weight = "bold"
+            if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
+                color = "#C80000"
+                weight = "bold"
+            elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
+                color = "#008000"
+                weight = "bold"
+            elif "Règle" in text or "Regle" in text:
+                color = "#800080"
+                weight = "bold"
+            elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
+                color = "#0066CC"
+                weight = "bold"
+            elif "Propriété" in text or "Propriete" in text:
+                color = "#FF8000"
+                weight = "bold"
+            elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
+                color = "#8B4513"
+                weight = "bold"
 
-                html_content += f'<div class="content-line" style="color: {color}; font-weight: {weight};">{text}</div>'
+            html_content += f'<div class="content-line" style="color: {color}; font-weight: {weight};">{text}</div>'
 
-            html_content += """
+        html_content += """
                             </td>
                             <td class="col-ens"></td>
                             <td class="col-app"></td>
@@ -189,22 +181,16 @@ if uploaded_ppt and st.button("توليد الجذاذة بالصفحات الم
                     </tbody>
                 </table>
             </div>
-            """
-
-        html_content += """
         </body>
         </html>
         """
 
-        st.success("تم توزيع الجذاذة وتنسيقها على صفحات A4 متسلسلة بنجاح!")
-        
-        st.markdown("### 📄 معاينة الجذاذة النهائية:")
-        st.components.v1.html(html_content, height=700, scrolling=True)
+        st.success("تم توليد الجذاذة بنجاح!")
+        st.components.v1.html(html_content, height=650, scrolling=True)
 
         st.download_button(
-            label="⬇️ تحميل الجذاذة كملف HTML (جاهز للطباعة وتوزيعه على صفحات PDF)",
+            label="⬇️ تحميل الجذاذة كملف HTML",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_Multi_Pages.html",
+            file_name="Jadad_Landscape_Fixed.html",
             mime="html"
-                            )
-                
+        )
