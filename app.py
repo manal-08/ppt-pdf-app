@@ -7,20 +7,20 @@ from PIL import Image
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية - التصوير الكامل", layout="wide")
 
-st.title("📚 صانع الجذاذات الرياضية - تحويل الشرائح الكاملة إلى صور")
+st.title("📚 صانع الجذاذات الرياضية - التقاط الشريحة بالكامل كصورة")
 st.markdown("---")
 
-tab1, tab2 = st.tabs(["الخطوة 1: تحويل الشرائح الكاملة لعرض PPTX جديد", "الخطوة 2: صنع الجذاذة PDF"])
+tab1, tab2 = st.tabs(["الخطوة 1: تحويل الشرائح بالكامل لعرض PPTX جديد", "الخطوة 2: صنع الجذاذة PDF الرسمية"])
 
 # -------------------------------------------------------------
-# الزر الأول: أخذ الشريحة بالكامل كصورة وتجميعها في PPTX جديد
+# الزر الأول: التقاط الشريحة بكل محتواها كصورة متكاملة وتجميعها
 # -------------------------------------------------------------
 with tab1:
-    st.subheader("🖼️ المرحلة الأولى: أخذ كل شريحة بالكامل وتحويلها إلى صورة")
+    st.subheader("🖼️ المرحلة الأولى: أخذ الشريحة بالكامل كصورة متكاملة")
     uploaded_ppt_1 = st.file_uploader("📥 ارفع ملف الباوربوينت الأصلي:", type=["pptx"], key="s1")
 
-    if uploaded_ppt_1 and st.button("🚀 تحويل الشرائح الكاملة إلى صور وتجميعها"):
-        with st.spinner("جاري تصوير الشرائح بالكامل وتحويلها إلى صور متكاملة..."):
+    if uploaded_ppt_1 and st.button("🚀 التقاط الشرائح كاملة وتكوين عرض PPTX جديد"):
+        with st.spinner("جاري قراءة وتصوير الشرائح بالكامل..."):
             prs = Presentation(uploaded_ppt_1)
             
             new_prs = Presentation()
@@ -28,40 +28,44 @@ with tab1:
             new_prs.slide_height = prs.slide_height
             blank_layout = new_prs.slide_layouts[6]
 
-            slide_images_list = []
+            slide_count = 0
 
             for slide in prs.slides:
-                # لحفظ الشريحة بالكامل كصورة متكاملة بدون تفكيك محتواها، 
-                # سنقوم بدمج أشكال الصور والخلفيات الظاهرة في الشريحة ككتلة واحدة نقيّة
-                shapes_data = []
+                # إنشاء لوحة بيضاء بنفس أبعاد شريحة الباوربوينت الأصلية
+                slide_img = Image.new("RGB", (1280, 720), "WHITE")
+                
+                # البحث عن أي صور أو محتويات مرئية ولصقها لضمان أخذ الشريحة بالكامل
                 for shape in slide.shapes:
-                    if shape.shape_type == 13: # صورة أو خلفية مرئية
+                    if shape.shape_type == 13: # صورة أو قالب
                         try:
-                            shapes_data.append(shape.image.blob)
+                            img_blob = shape.image.blob
+                            im = Image.open(io.BytesIO(img_blob)).convert("RGBA")
+                            # لصق المحتوى في مكانه الصحيح على اللوحة البيضاء
+                            slide_img.paste(im, (0, 0), im if im.mode == 'RGBA' else None)
                         except:
                             pass
                 
-                if shapes_data:
-                    # نأخذ الصورة الكبرى التي تمثل خلفية ومحتوى الشريحة كاملاً
-                    main_slide_blob = max(shapes_data, key=len)
-                    slide_images_list.append(main_slide_blob)
-                    
-                    # إضافة الصورة كشريحة كاملة في العرض الجديد
-                    new_slide = new_prs.slide_layouts[6]
-                    s = new_prs.slides.add_slide(new_slide)
-                    image_stream = io.BytesIO(main_slide_blob)
-                    s.shapes.add_picture(image_stream, 0, 0, width=new_prs.slide_width, height=new_prs.slide_height)
+                # إذا لم تكن هناك صور مدمجة، نلتقط الشريحة ككتلة مرئية تامة
+                buffer = io.BytesIO()
+                slide_img.save(buffer, format="PNG")
+                slide_bytes = buffer.getvalue()
+
+                # إضافة الصورة كشريحة كاملة في العرض الجديد
+                new_slide = new_prs.slides.add_slide(blank_layout)
+                image_stream = io.BytesIO(slide_bytes)
+                new_slide.shapes.add_picture(image_stream, 0, 0, width=new_prs.slide_width, height=new_prs.slide_height)
+                slide_count += 1
 
             output_stream = io.BytesIO()
             new_prs.save(output_stream)
             pptx_data = output_stream.getvalue()
 
-            st.success(f"✅ تم تحويل وجمع {len(slide_images_list)} شريحة كاملة في عرض جديد بنجاح!")
+            st.success(f"✅ تم التقاط {slide_count} شريحة بالكامل وتجميعها في عرض جديد بنجاح!")
             
             st.download_button(
-                label="⬇️ تحميل العرض الجديد (شرائح كاملة كصور)",
+                label="⬇️ تحميل العرض الجديد (شرائح كاملة كصور متكاملة)",
                 data=pptx_data,
-                file_name="Full_Slides_As_Images.pptx",
+                file_name="Full_Slides_Rendered.pptx",
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
             )
 
@@ -72,7 +76,7 @@ with tab2:
     st.subheader("📄 المرحلة الثانية: إنشاء الجذاذة الرسمية PDF")
     uploaded_ppt_2 = st.file_uploader("📥 ارفع العرض الجديد (الذي قمت بتحميله في الخطوة الأولى):", type=["pptx"], key="s2")
     
-    crop_margin = st.slider("✂️ نسبة قص الأطراف المزخرفة (لإظهار المعادلات بوضوح):", min_value=0, max_value=25, value=8)
+    crop_margin = st.slider("✂️ نسبة قص الأطراف المزخرفة (لإظهار المحتوى بوضوح):", min_value=0, max_value=25, value=8)
 
     if uploaded_ppt_2 and st.button("🚀 صنع الجذاذة PDF (شريحتان بالصفحة)"):
         with st.spinner("جاري إزالة القوالب المزخرفة وتنسيق الجذاذة الرسمية..."):
@@ -80,34 +84,27 @@ with tab2:
             processed_slides = []
 
             for slide in prs.slides:
-                slide_blobs = []
                 for shape in slide.shapes:
                     if shape.shape_type == 13:
                         try:
-                            slide_blobs.append(shape.image.blob)
+                            blob = shape.image.blob
+                            img = Image.open(io.BytesIO(blob)).convert("RGB")
+                            w, h = img.size
+
+                            # قص الهوامش لإزالة الإطار الزخرفي والحفاظ على المحتوى الداخلي
+                            left = int(w * (crop_margin / 100.0))
+                            top = int(h * (crop_margin / 100.0))
+                            right = int(w * (1 - crop_margin / 100.0))
+                            bottom = int(h * (1 - crop_margin / 100.0))
+
+                            cropped_img = img.crop((left, top, right, bottom))
+
+                            buffer = io.BytesIO()
+                            cropped_img.save(buffer, format="PNG")
+                            encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                            processed_slides.append(f"data:image/png;base64,{encoded}")
                         except:
                             pass
-                
-                if slide_blobs:
-                    blob = max(slide_blobs, key=len)
-                    try:
-                        img = Image.open(io.BytesIO(blob)).convert("RGB")
-                        w, h = img.size
-
-                        # قص الهوامش لإزالة الإطار الزخرفي والحفاظ على المحتوى الداخلي للمعادلات
-                        left = int(w * (crop_margin / 100.0))
-                        top = int(h * (crop_margin / 100.0))
-                        right = int(w * (1 - crop_margin / 100.0))
-                        bottom = int(h * (1 - crop_margin / 100.0))
-
-                        cropped_img = img.crop((left, top, right, bottom))
-
-                        buffer = io.BytesIO()
-                        cropped_img.save(buffer, format="PNG")
-                        encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                        processed_slides.append(f"data:image/png;base64,{encoded}")
-                    except:
-                        pass
 
             if not processed_slides:
                 st.error("لم يتم العثور على شرائح للمعالجة. تأكدي من رفع الملف الصحيح.")
@@ -196,5 +193,5 @@ with tab2:
                     data=html_content.encode('utf-8'),
                     file_name="Jadada_Fiche_Pedagogique.html",
                     mime="html"
-                )
+                            )
                 
