@@ -4,12 +4,12 @@ import os
 import base64
 
 st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
-st.title("📚 صانع الجذاذات الرياضية - استقرار الجدول الأفقي (A4 Landscape)")
+st.title("📚 صانع الجذاذات الرياضية - تصدير PDF مباشر للطباعة")
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرات والمعادلات"):
-    with st.spinner("جاري استخراج كافة فقرات الدرس والمعادلات بدقة..."):
+if uploaded_ppt and st.button("توليد الجذاذة وتجهيز ملف PDF"):
+    with st.spinner("جاري تنقية المحتوى واستخراج المعادلات والتمارين..."):
         prs = Presentation(uploaded_ppt)
         all_elements = []
         
@@ -18,20 +18,24 @@ if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرا
 
         for slide_idx, slide in enumerate(prs.slides, start=1):
             for shape in slide.shapes:
-                # استخراج كافة النصوص المتاحة في الشريحة دون استثناء
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
                         txt = paragraph.text.strip()
                         if txt:
                             all_elements.append(("TEXT", txt))
                 
-                # استخراج الصور والرموز الرياضية الأساسية
                 elif shape.shape_type == 13:
                     try:
                         image_bytes = shape.image.blob
-                        if len(image_bytes) < 2000: # تجاهل الأيقونات الصغيرة جداً فقط
+                        # استبعاد الأيقونات وقوالب الخلفية الكبيرة
+                        if len(image_bytes) < 3000 or len(image_bytes) > 120000:
                             continue
                             
+                        width = shape.width
+                        height = shape.height
+                        if width > 5000000 or height > 4000000:
+                            continue
+
                         img_counter += 1
                         img_filename = f"extracted_slide_images/slide_{slide_idx}_img_{img_counter}.png"
                         with open(img_filename, "wb") as f:
@@ -45,7 +49,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرا
                     except Exception:
                         pass
 
-        # بناء قالب الجدول الأفقي المتناسق
+        # بناء الجدول الأفقي وإضافة أمر الطباعة التلقائية لصيغة PDF
         html_content = """
         <!DOCTYPE html>
         <html lang="fr">
@@ -63,6 +67,20 @@ if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرا
                     font-family: Arial, sans-serif;
                     direction: ltr;
                     color: #000000;
+                }
+                .print-btn-bar {
+                    text-align: center;
+                    margin-bottom: 15px;
+                }
+                .btn-print {
+                    background-color: #008CBA;
+                    color: white;
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                    font-family: sans-serif;
                 }
                 .page-container {
                     background-color: #ffffff;
@@ -108,7 +126,7 @@ if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرا
                     font-size: 13px;
                 }
                 .slide-image {
-                    max-width: 45%;
+                    max-width: 40%;
                     height: auto;
                     display: block;
                     margin: 8px auto;
@@ -118,12 +136,16 @@ if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرا
                     mix-blend-mode: multiply;
                 }
                 @media print {
+                    .print-btn-bar { display: none; }
                     body { background: none; padding: 0; }
                     .page-container { box-shadow: none; max-width: 100%; padding: 0; }
                 }
             </style>
         </head>
         <body>
+            <div class="print-btn-bar">
+                <button class="btn-print" onclick="window.print()">🖨️ طباعة الجذاذة / حفظ كـ PDF مباشر</button>
+            </div>
             <div class="page-container">
                 <table class="fiche-table">
                     <thead>
@@ -152,24 +174,23 @@ if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرا
             color = "#000000"
             weight = "normal"
 
-            # تطبيق الألوان البيداغوجية بدقة على النصوص
             if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                color = "#C80000"  # أحمر للأرقام الرومانية
+                color = "#C80000"
                 weight = "bold"
             elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                color = "#008000"  # أخضر للعناوين
+                color = "#008000"
                 weight = "bold"
             elif "Règle" in text or "Regle" in text:
-                color = "#800080"  # بنفسجي للقواعد
+                color = "#800080"
                 weight = "bold"
             elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                color = "#0066CC"  # أزرق سماوي للأنشطة والتعريفات والأمثلة
+                color = "#0066CC"
                 weight = "bold"
             elif "Propriété" in text or "Propriete" in text:
-                color = "#FF8000"  # برتقالي للخاصيات
+                color = "#FF8000"
                 weight = "bold"
             elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                color = "#8B4513"  # بني للتطبيقات والتمارين
+                color = "#8B4513"
                 weight = "bold"
 
             html_content += f'<div class="content-line" style="color: {color}; font-weight: {weight};">{text}</div>'
@@ -187,13 +208,12 @@ if uploaded_ppt and st.button("توليد الجذاذة بكافة الفقرا
         </html>
         """
 
-        st.success("تم استخراج كافة فقرات الدرس والمعادلات بنجاح!")
+        st.success("تم تجهيز الجذاذة للطباعة والمباشرة بصيغة PDF!")
         st.components.v1.html(html_content, height=650, scrolling=True)
 
         st.download_button(
-            label="⬇️ تحميل الجذاذة كملف HTML",
+            label="⬇️ فتح الجذاذة (ثم اضغط زر الطباعة المباشرة لتنزيل PDF)",
             data=html_content.encode('utf-8'),
-            file_name="Jadad_Complete_Math.html",
-            mime="html"
+            file_name="Jadad_Print_Ready.html",
+            mime="text/html"
         )
-        
