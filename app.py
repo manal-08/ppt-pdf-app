@@ -50,44 +50,18 @@ if uploaded_ppt and st.button("توليد الجذاذة وتحويلها إلى
         pdf = FPDF()
         pdf.add_page()
         pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.set_font("Helvetica", size=9)
 
-        for el_type, text in all_content:
-            if el_type == "TITLE_SLIDE":
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.set_text_color(100, 100, 100)
-                safe_txt = text.encode('latin-1', 'replace').decode('latin-1')
-                pdf.multi_cell(0, 5, txt=safe_txt)
-                pdf.ln(1)
-                continue
-
-            r, g, b = 0, 0, 0
-            is_bold = False
-
-            if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                r, g, b = 200, 0, 0
-                is_bold = True
-            elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                r, g, b = 0, 128, 0
-                is_bold = True
-            elif "Règle" in text or "Regle" in text:
-                r, g, b = 128, 0, 128
-                is_bold = True
-            elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                r, g, b = 0, 102, 204
-                is_bold = True
-            elif "Propriété" in text or "Propriete" in text:
-                r, g, b = 255, 128, 0
-                is_bold = True
-            elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                r, g, b = 139, 69, 19
-                is_bold = True
-
-            pdf.set_font("Helvetica", "B" if is_bold else "", 9)
+        # دالة لطباعة النصوص بشكل آمن ومضبوط تماماً دون أي أخطاء مساحة
+        def safe_print(text, size=9, bold=False, r=0, g=0, b=0):
+            style = "B" if bold else ""
+            pdf.set_font("Helvetica", style, size)
             pdf.set_text_color(r, g, b)
             
-            # تقطيع الكلمات الطويلة لمنع حدوث خطأ المساحة
             words = text.split()
+            if not words:
+                pdf.multi_cell(0, 6, txt="")
+                return
+            
             current_line = ""
             for word in words:
                 safe_word = word.encode('latin-1', 'replace').decode('latin-1')
@@ -99,9 +73,40 @@ if uploaded_ppt and st.button("توليد الجذاذة وتحويلها إلى
             if current_line:
                 pdf.multi_cell(0, 6, txt=current_line)
 
+        for el_type, text in all_content:
+            if el_type == "TITLE_SLIDE":
+                pdf.ln(2)
+                safe_print(text, size=10, bold=True, r=100, g=100, b=100)
+                continue
+
+            # الألوان البيداغوجية حسب طلبك:
+            r, g, b = 0, 0, 0
+            is_bold = False
+
+            if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
+                r, g, b = 200, 0, 0  # أحمر للعناوين الرومانية
+                is_bold = True
+            elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
+                r, g, b = 0, 128, 0  # أخضر للعناوين العادية
+                is_bold = True
+            elif "Règle" in text or "Regle" in text:
+                r, g, b = 128, 0, 128  # بنفسجي للقواعد
+                is_bold = True
+            elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
+                r, g, b = 0, 102, 204  # أزرق سماوي للأنشطة والتعريفات والأمثلة
+                is_bold = True
+            elif "Propriété" in text or "Propriete" in text:
+                r, g, b = 255, 128, 0  # برتقالي للخاصيات
+                is_bold = True
+            elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
+                r, g, b = 139, 69, 19  # بني للتطبيقات والتمارين
+                is_bold = True
+
+            safe_print(text, size=9, bold=is_bold, r=r, g=g, b=b)
+
         pdf_output = pdf.output()
 
-        st.success("تم توليد الجذاذة بنجاح وبدون أخطاء!")
+        st.success("تم توليد الجذاذة بنجاح وبدون أي أخطاء!")
         st.download_button(
             label="⬇️ تحميل الجذاذة بصيغة PDF",
             data=bytes(pdf_output),
