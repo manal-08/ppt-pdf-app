@@ -13,7 +13,6 @@ uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخا
 def process_slide_to_clean_image(shape_images):
     """ دمج وتصفية عناصر الشريحة للحصول على صورة بيضاء نقية تحتوي المحتوى فقط """
     try:
-        # إنشاء خلفية بيضاء بمقاسات الشريحة القياسية
         combined_img = Image.new("RGB", (1000, 562), "WHITE")
         
         for img_bytes in shape_images:
@@ -25,16 +24,13 @@ def process_slide_to_clean_image(shape_images):
                 if w > 850 and h > 480:
                     continue
                 
-                # تحويل الخلفيات الشفافة أو الملصقة إلى بيضاء وتصحيح التباين
                 temp_img = Image.new("RGBA", img.size, "WHITE")
                 temp_img.paste(img, (0, 0), img)
                 temp_rgb = temp_img.convert("RGB")
                 
-                # تضخيم النقاء والتأكد من إزالة أي أثر ملون للخلفية
                 enhancer = ImageEnhance.Contrast(temp_rgb)
                 temp_rgb = enhancer.enhance(1.2)
                 
-                # لصق المحتوى المصفى على الصفحة البيضاء
                 combined_img.paste(temp_rgb, (0, 0))
             except Exception:
                 pass
@@ -58,18 +54,16 @@ if uploaded_ppt and st.button("توليد الجذاذة بالشرائح الن
                 if shape.shape_type == 13: # صورة أو معادلة مدمجة
                     try:
                         image_bytes = shape.image.blob
-                        # استبعاد الأيقونات الصغرى
                         if len(image_bytes) > 2500:
                             slide_shapes_bytes.append(image_bytes)
                     except Exception:
                         pass
             
-            # معالجة الشريحة وإرجاع صورتها النظيفة
             cleaned_slide_img = process_slide_to_clean_image(slide_shapes_bytes)
             if cleaned_slide_img:
                 slides_clean_images.append(cleaned_slide_img)
 
-        # دمج كل شريحتين معاً في قائمة واحدة
+        # دمج كل شريحتين معاً في صفحة واحدة
         paired_slides = [slides_clean_images[i:i + 2] for i in range(0, len(slides_clean_images), 2)]
 
         html_content = """
@@ -216,13 +210,5 @@ if uploaded_ppt and st.button("توليد الجذاذة بالشرائح الن
             label="⬇️ تحميل الجذاذة (HTML جاهز للحفظ كـ PDF)",
             data=html_content.encode('utf-8'),
             file_name="Jadad_2Slides_Clean.html",
-            mime="html"
-        )
-ue)
-
-        st.download_button(
-            label="⬇️ تحميل ملف الجذاذة (HTML جاهز للطباعة كـ PDF)",
-            data=html_content.encode('utf-8'),
-            file_name="Jadad_Math_2Slides_PerPage.html",
             mime="html"
         )
