@@ -1,76 +1,146 @@
 import streamlit as st
 from pptx import Presentation
+from pptx.util import Inches
 import os
 import base64
 from PIL import Image
 import io
 
-st.set_page_config(page_title="صانع الجذاذات الرياضية الرسمي", layout="wide")
+st.set_page_config(page_title="صانع الجذاذات الرياضية التلقائي", layout="wide")
 
-st.title("📚 صانع الجذاذات - القص الدقيق للإطار وتحويل الشرائح لـ PDF")
+st.title("📚 صانع الجذاذات الرياضية - تحويل الشرائح وتجميع العرض والجذاذة")
+st.markdown("---")
 
-uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت الخاص بالدرس (PPTX)", type=["pptx"])
+uploaded_pptx = st.file_uploader("📥 قم برفع ملف الباوربوينت (PPTX) الخاص بالدرس:", type=["pptx"])
 
-# زر لإتاحة تعديل نسبة قص الهامش المزخرف إن أردتِ التحكم فيها
-crop_ratio = st.slider("نسبة قص الإطار المزخرف من الجوانب (%)", min_value=0, max_value=20, value=9)
+# شريط تحكم في نسبة قص الإطار المزخرف من الجوانب
+margin_crop = st.slider("✂️ نسبة قص الإطار المزخرف من الجوانب (%):", min_value=0, max_value=20, value=8)
 
-def process_slide_to_clean_image(image_bytes, crop_pct):
-    """ أخذ صورة الشريحة، قص الجوانب المزخرفة، والحفاظ على معادلات الدرس """
+def crop_and_clean_image_bytes(img_bytes, crop_pct):
+    """ قص الإطار المزخرف الخارجي للشريحة وتبييض الخلفية مع الحفاظ 100% على المعادلة """
     try:
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         w, h = img.size
 
-        # حساب هوامش القص المستطيلي بحسب النسبة
+        # حساب هوامش القص لإزالة الزخرفة المحيطة
         left = int(w * (crop_pct / 100.0))
         top = int(h * (crop_pct / 100.0))
-        right = int(w * (1.0 - (crop_pct / 100.0)))
-        bottom = int(h * (1.0 - (crop_pct / 100.0)))
+        right = int(w * (1 - crop_pct / 100.0))
+        bottom = int(h * (1 - crop_pct / 100.0))
 
-        # قص المستطيل الخارجي وتصليح الخلفية
-        cropped_img = img.crop((left, top, right, bottom))
-        
-        # تنقية الألوان الفاتحة وتوحيد الخلفية البيضاء
-        data = cropped_img.getdata()
-        new_data = []
-        for item in data:
-            # الألوان القريبة جداً من الأبيض تتحول لأبيض ناصع مع الحفاظ على النص والمعادلات
-            if item[0] > 220 and item[1] > 220 and item[2] > 220:
-                new_data.append((255, 255, 255))
-            else:
-                new_data.append(item)
-        cropped_img.putdata(new_data)
+        cropped = img.crop((left, top, right, bottom))
 
-        buffer = io.BytesIO()
-        cropped_img.save(buffer, format="PNG")
-        encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return f"data:image/png;base64,{encoded}"
+        # حفظ الصورة النظيفة كـ Bytes
+        img_buffer = io.BytesIO()
+        cropped.save(img_buffer, format="PNG")
+        cleaned_bytes = img_buffer.getvalue()
+
+        # تحويل لـ base64 للعرض في HTML
+        encoded = base64.b64encode(cleaned_bytes).decode('utf-8')
+        b64_str = f"data:image/png;base64,{encoded}"
+
+        return cleaned_bytes, b64_str
     except Exception:
-        return None
+        return None, None
 
-# الزر المطلوب لتوليد الجذاذة فور رفع الملف
-if uploaded_ppt and st.button("🚀 صنع الجذاذة (قص الإطار المزخرف + شريحتين بالصفحة)"):
-    with st.spinner("جاري قص إطار الزينة وتنسيق شرائح الدرس..."):
-        prs = Presentation(uploaded_ppt)
-        clean_slides = []
+def process_pptx_slides(pptx_file_bytes, crop_pct):
+    """ استخراج الصور، قصها، وتجهيز الصور المعالجة """
+    prs = Presentation(io.BytesIO(pptx_file_bytes))
+    raw_images_bytes = []
+    b64_images = []
 
-        for slide in prs.slides:
-            slide_shapes_bytes = []
-            for shape in slide.shapes:
-                if shape.shape_type == 13: # صورة الشريحة أو العناصر
-                    try:
-                        slide_shapes_bytes.append(shape.image.blob)
-                    except Exception:
-                        pass
+    for slide in prs.slides:
+        slide_shapes_bytes = []
+        for shape in slide.shapes:
+            if shape.shape_type == 13: # صورة أو عنصر مرسوم
+                try:
+                    slide_shapes_bytes.append(shape.image.blob)
+                except Exception:
+                    pass
+        
+        if slide_shapes_bytes:
+            # أخذ أكبر صورة تمثل محتوى الشريحة
+            main_blob = max(slide_shapes_bytes, key=len)
+            c_bytes, b64_str = crop_and_clean_image_bytes(main_blob, crop_pct)
+            if c_bytes:
+                raw_images_bytes.append(c_bytes)
+                b64_images.append(b64_str)
+
+    return raw_images_bytes, b64_images
+
+def create_new_pptx_from_images(images_bytes_list):
+    """ دمج الصور النظيفة المقصوصة في عرض باوربوينت جديد تماماً """
+    new_prs = Presentation()
+    # ضبط مقاس الشريحة ليكون 16:9 شاشة عريضة
+    new_prs.slide_width = Inches(13.33)
+    new_prs.slide_height = Inches(7.5)
+    blank_layout = new_prs.slide_layouts[6] # شريحة فارغة
+
+    for img_bytes in images_bytes_list:
+        slide = new_prs.slides.add_slide(blank_layout)
+        image_stream = io.BytesIO(img_bytes)
+        # إدراج الصورة لتملأ الشريحة بالكامل
+        slide.shapes.add_picture(image_stream, 0, 0, width=new_prs.slide_width, height=new_prs.slide_height)
+
+    output_stream = io.BytesIO()
+    new_prs.save(output_stream)
+    return output_stream.getvalue()
+
+# حفظ البيانات بين الخطوات
+if "cleaned_bytes_list" not in st.session_state:
+    st.session_state["cleaned_bytes_list"] = []
+if "cleaned_b64_list" not in st.session_state:
+    st.session_state["cleaned_b64_list"] = []
+
+col1, col2 = st.columns(2)
+
+with col1:
+    btn_step1 = st.button("🖼️ 1. تحويل الشرائح لصور وتجميعها في PPTX جديد")
+
+with col2:
+    btn_step2 = st.button("📄 2. صنع الجذاذة PDF الرسمية (شريحتان بالصفحة)")
+
+# الخطوة الأولى: قص الشرائح وإعادة تجميعها في ملف باوربوينت جديد
+if uploaded_pptx and btn_step1:
+    with st.spinner("جاري قص الإطارات المزخرفة وتجميع عرض PPTX الجديد النظيف..."):
+        pptx_bytes = uploaded_pptx.read()
+        raw_bytes, b64_list = process_pptx_slides(pptx_bytes, margin_crop)
+
+        if raw_bytes:
+            st.session_state["cleaned_bytes_list"] = raw_bytes
+            st.session_state["cleaned_b64_list"] = b64_list
+
+            # إنشاء ملف PowerPoint جديد بالصور المقصوصة
+            new_pptx_data = create_new_pptx_from_images(raw_bytes)
+
+            st.success(f"✅ تم تحويل وقص {len(raw_bytes)} شريحة بنجاح وتجميعها في ملف باوربوينت جديد!")
             
-            if slide_shapes_bytes:
-                # أخذ الصورة الرئيسية المقابلة للشريحة
-                main_bytes = max(slide_shapes_bytes, key=len)
-                cleaned_img = process_slide_to_clean_image(main_bytes, crop_ratio)
-                if cleaned_img:
-                    clean_slides.append(cleaned_img)
+            st.download_button(
+                label="⬇️ تحميل العرض التقديمي الجديد (PPTX صور مقصوصة)",
+                data=new_pptx_data,
+                file_name="Lesson_Slides_Cleaned.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )
+        else:
+            st.error("لم نتمكن من التقاط محتوى الشرائح، يُرجى التأكد من رفع ملف PPTX رسمي.")
 
-        # دمج كل شريحتين متتاليتين في صفحة A4 واحدة
-        paired_slides = [clean_slides[i:i + 2] for i in range(0, len(clean_slides), 2)]
+# الخطوة الثانية: صنع ملف الجذاذة PDF بنفس الصور المقصوصة
+if btn_step2:
+    b64_list = st.session_state.get("cleaned_b64_list", [])
+
+    # في حال اضطرت الأستاذة للضغط على الزر الثاني مباشرة
+    if not b64_list and uploaded_pptx:
+        with st.spinner("جاري معالجة الملف مباشرة لإنشاء الجذاذة..."):
+            pptx_bytes = uploaded_pptx.read()
+            raw_bytes, b64_list = process_pptx_slides(pptx_bytes, margin_crop)
+            st.session_state["cleaned_bytes_list"] = raw_bytes
+            st.session_state["cleaned_b64_list"] = b64_list
+
+    if not b64_list:
+        st.warning("⚠️ يُرجى رفع ملف الباوربوينت الـ PPTX أولاً!")
+    else:
+        # تجميع كل شريحتين في صفحة A4 Landscape واحدة
+        paired_slides = [b64_list[i:i + 2] for i in range(0, len(b64_list), 2)]
 
         html_content = """
         <!DOCTYPE html>
@@ -149,7 +219,7 @@ if uploaded_ppt and st.button("🚀 صنع الجذاذة (قص الإطار ا�
                     background: #ffffff;
                 }
                 .slide-sep {
-                    border-bottom: 1px dashed #bbb;
+                    border-bottom: 1px dashed #ccc;
                     margin: 6px 0;
                 }
                 @media print {
@@ -202,12 +272,9 @@ if uploaded_ppt and st.button("🚀 صنع الجذاذة (قص الإطار ا�
             </div>
             """
 
-        html_content += """
-        </body>
-        </html>
-        """
+        html_content += "</body></html>"
 
-        st.success("تم توليد الجذاذة بنجاح! اضغطي على زر حفظ PDF بالأسفل.")
+        st.success("✨ تم إنشاء الجذاذة الرسمية بنجاح!")
         st.components.v1.html(html_content, height=680, scrolling=True)
 
         st.download_button(
@@ -215,4 +282,5 @@ if uploaded_ppt and st.button("🚀 صنع الجذاذة (قص الإطار ا�
             data=html_content.encode('utf-8'),
             file_name="Jadada_Math_Final.html",
             mime="html"
-        )
+            )
+        
