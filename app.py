@@ -1,9 +1,7 @@
 import streamlit as st
 from pptx import Presentation
-from fpdf import FPDF
 import os
 import easyocr
-import numpy as np
 
 @st.cache_resource
 def load_reader():
@@ -16,7 +14,7 @@ st.title("📚 منصة توليد الجذاذات الرياضية من الب
 
 uploaded_ppt = st.file_uploader("اختر ملف الباوربوينت (PPTX)", type=["pptx"])
 
-if uploaded_ppt and st.button("توليد الجذاذة وتحويلها إلى PDF"):
+if uploaded_ppt and st.button("توليد الجذاذة وترتيبها"):
     with st.spinner("جاري استخراج النصوص والمعادلات وتنسيق الجذاذة..."):
         prs = Presentation(uploaded_ppt)
         all_content = []
@@ -47,69 +45,53 @@ if uploaded_ppt and st.button("توليد الجذاذة وتحويلها إلى
                     except Exception:
                         pass
 
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
-
-        # دالة لطباعة النصوص بشكل آمن ومضبوط تماماً دون أي أخطاء مساحة
-        def safe_print(text, size=9, bold=False, r=0, g=0, b=0):
-            style = "B" if bold else ""
-            pdf.set_font("Helvetica", style, size)
-            pdf.set_text_color(r, g, b)
-            
-            words = text.split()
-            if not words:
-                pdf.multi_cell(0, 6, txt="")
-                return
-            
-            current_line = ""
-            for word in words:
-                safe_word = word.encode('latin-1', 'replace').decode('latin-1')
-                if pdf.get_string_width(current_line + " " + safe_word) < 180:
-                    current_line += (" " + safe_word) if current_line else safe_word
-                else:
-                    pdf.multi_cell(0, 6, txt=current_line)
-                    current_line = safe_word
-            if current_line:
-                pdf.multi_cell(0, 6, txt=current_line)
+        # بناء محتوى HTML منسق بالألوان المطلوبة تماماً
+        html_content = """
+        <div style="font-family: Arial, sans-serif; direction: ltr; padding: 20px; background-color: #fff; color: #000;">
+        """
 
         for el_type, text in all_content:
             if el_type == "TITLE_SLIDE":
-                pdf.ln(2)
-                safe_print(text, size=10, bold=True, r=100, g=100, b=100)
+                html_content += f"<h3 style='color: #646464; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px;'>{text}</h3>"
                 continue
 
+            color = "#000000"  # أسود افتراضي
+            weight = "normal"
+
             # الألوان البيداغوجية حسب طلبك:
-            r, g, b = 0, 0, 0
-            is_bold = False
-
             if any(text.startswith(roman) for roman in ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]):
-                r, g, b = 200, 0, 0  # أحمر للعناوين الرومانية
-                is_bold = True
+                color = "#C80000"  # أحمر للعناوين الرومانية
+                weight = "bold"
             elif any(text.startswith(f"{i})") or text.startswith(f"{i} -") for i in range(1, 15)):
-                r, g, b = 0, 128, 0  # أخضر للعناوين العادية
-                is_bold = True
+                color = "#008000"  # أخضر للعناوين العادية
+                weight = "bold"
             elif "Règle" in text or "Regle" in text:
-                r, g, b = 128, 0, 128  # بنفسجي للقواعد
-                is_bold = True
+                color = "#800080"  # بنفسجي للقواعد
+                weight = "bold"
             elif any(k in text for k in ["Activité", "Activite", "Exemple", "Exemples", "Définition", "Definition", "Remarque"]):
-                r, g, b = 0, 102, 204  # أزرق سماوي للأنشطة والتعريفات والأمثلة
-                is_bold = True
+                color = "#0066CC"  # أزرق سماوي
+                weight = "bold"
             elif "Propriété" in text or "Propriete" in text:
-                r, g, b = 255, 128, 0  # برتقالي للخاصيات
-                is_bold = True
+                color = "#FF8000"  # برتقالي للخاصيات
+                weight = "bold"
             elif any(k in text for k in ["Application", "Exercice", "Exercices"]):
-                r, g, b = 139, 69, 19  # بني للتطبيقات والتمارين
-                is_bold = True
+                color = "#8B4513"  # بني للتطبيقات
+                weight = "bold"
 
-            safe_print(text, size=9, bold=is_bold, r=r, g=g, b=b)
+            html_content += f"<p style='color: {color}; font-weight: {weight}; margin: 5px 0;'>{text}</p>"
 
-        pdf_output = pdf.output()
+        html_content += "</div>"
 
-        st.success("تم توليد الجذاذة بنجاح وبدون أي أخطاء!")
+        st.success("تم توليد الجذاذة بنجاح وبجميع الألوان المطلوبة!")
+        
+        # عرض الجذاذة مباشرة على الشاشة بشكل جميل
+        st.markdown("### 📄 معاينة الجذاذة النهائية:")
+        st.markdown(html_content, unsafe_allow_html=True)
+
+        # زر تحميل النتيجة كملف HTML (يمكن فتحه وطباعته كـ PDF من المتصفح مباشرة)
         st.download_button(
-            label="⬇️ تحميل الجذاذة بصيغة PDF",
-            data=bytes(pdf_output),
-            file_name="Jadad_Mathematiques_Pro.pdf",
-            mime="application/pdf"
+            label="⬇️ تحميل الجذاذة كملف (جاهز للطباعة)",
+            data=html_content.encode('utf-8'),
+            file_name="Jadad_Mathematiques_Pro.html",
+            mime="text/html"
         )
