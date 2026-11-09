@@ -9,7 +9,7 @@ import streamlit as st
 
 st.set_page_config(page_title="معالج شرائح الرياضيات", layout="centered")
 
-st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📐 معالج شرائح دروس الرياضيات (ضبط عرض الجدول مع الصور)</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📐 معالج شرائح دروس الرياضيات</h2>", unsafe_allow_html=True)
 st.write("---")
 
 uploaded_file = st.file_uploader("📥 ارفعي ملف الـ PDF الأصلي:", type=[".pdf"])
@@ -115,11 +115,11 @@ if uploaded_file is not None:
                     slide1_io = cropped_images[i]
                     slide2_io = cropped_images[i + 1] if i + 1 < len(cropped_images) else None
 
-                    # عرض الصورة مضبوط على 320 بكسل
-                    img1 = RLImage(slide1_io, width=320, height=140, preserveAspectRatio=True)
+                    # تم إزالة المعامل غير المدعوم وحفظ الأبعاد بدقة
+                    img1 = RLImage(slide1_io, width=320, height=140)
                     
                     if slide2_io:
-                        img2 = RLImage(slide2_io, width=320, height=140, preserveAspectRatio=True)
+                        img2 = RLImage(slide2_io, width=320, height=140)
                         contenu_content = [img1, Spacer(1, 10), img2]
                     else:
                         contenu_content = [img1]
@@ -140,7 +140,7 @@ if uploaded_file is not None:
                         ]
                     ]
 
-                    # تم ضبط عرض خانة Contenu لتكون 320 تماماً مثل عرض الصور
+                    # عرض خانة Contenu مطابق تماماً لعرض الصور (320)
                     col_widths = [55, 55, 320, 110, 110, 110]
                     table = Table(data, colWidths=col_widths)
                     table.setStyle(TableStyle([
@@ -159,7 +159,7 @@ if uploaded_file is not None:
                 pdf_output_doc.build(story)
                 output_pdf_io.seek(0)
 
-                st.success("✨ تم تعديل عرض خانة Contenu لتتطابق تماماً مع عرض الصور!")
+                st.success("✨ تم معالجة وتوليد الملف بنجاح وبدون أي أخطاء!")
                 st.download_button(
                     label="📥 تحميل الملف النهائي (PDF)",
                     data=output_pdf_io,
@@ -170,4 +170,4 @@ if uploaded_file is not None:
 
             except Exception as e:
                 st.error(f"❌ حدث خطأ أثناء المعالجة: {e}")
-                        
+                    
