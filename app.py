@@ -15,26 +15,35 @@ st.write("---")
 # رفع ملف الـ PDF
 uploaded_file = st.file_uploader("📥 ارفعي ملف الـ PDF الأصلي:", type=[".pdf"])
 
-# أدوات التحكم الجانبية للقص تماماً مثل نسخة المتصفح
-st.sidebar.header("✂️ أدوات قص الهوامش")
-crop_left = st.sidebar.slider("القص يسار (%)", 0, 30, 0) / 100.0
-crop_right = st.sidebar.slider("القص يمين (%)", 0, 30, 0) / 100.0
-crop_top = st.sidebar.slider("القص أعلى (%)", 0, 30, 0) / 100.0
-crop_bottom = st.sidebar.slider("القص أسفل (%)", 0, 30, 0) / 100.0
-
+pdf_doc = None
 if uploaded_file is not None:
+    pdf_bytes = uploaded_file.read()
+    pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    
+    st.success(f"✅ تم تحميل الـ PDF بنجاح ({len(pdf_doc)} صفحة).")
+
+    # تنظيم أدوات القص بشكل مشابه لتصميم الـ HTML في نفس الصفحة
+    st.markdown("### ✂️ إعدادات قص الهوامش")
+    col1, col2 = st.columns(2)
+    with col1:
+        crop_left = st.slider("القص يسار (%)", 0, 30, 0) / 100.0
+        crop_top = st.slider("القص أعلى (%)", 0, 30, 0) / 100.0
+    with col2:
+        crop_right = st.slider("القص يمين (%)", 0, 30, 0) / 100.0
+        crop_bottom = st.slider("القص أسفل (%)", 0, 30, 0) / 100.0
+
+    st.write("---")
+
     if st.button("📄 قص الشرائح وإنشاء الجذاذة (تنزيل PDF)", use_container_width=True):
         with st.spinner("جاري معالجة وقص الشرائح وإزالة الخلفية البيضاء..."):
             try:
-                pdf_bytes = uploaded_file.read()
-                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
                 cropped_images = []
 
                 # تجاهل الشريحة الأولى تماماً والبدء من الصفحة الثانية
-                start_page = 1 if len(doc) > 1 else 0
+                start_page = 1 if len(pdf_doc) > 1 else 0
 
-                for page_num in range(start_page, len(doc)):
-                    page = doc[page_num]
+                for page_num in range(start_page, len(pdf_doc)):
+                    page = pdf_doc[page_num]
                     pix = page.get_pixmap(dpi=150)
                     img = Image.open(io.BytesIO(pix.tobytes("png")))
                     
@@ -65,7 +74,7 @@ if uploaded_file is not None:
 
                 # إنشاء ملف الـ PDF النهائي بتنسيق A4 Landscape وتصميم الجذاذة
                 output_pdf_io = io.BytesIO()
-                pdf_doc = SimpleDocTemplate(
+                pdf_output_doc = SimpleDocTemplate(
                     output_pdf_io,
                     pagesize=landscape(A4),
                     rightMargin=12, leftMargin=12, topMargin=12, bottomMargin=12
@@ -121,7 +130,7 @@ if uploaded_file is not None:
                     if i + images_per_slide < len(cropped_images):
                         story.append(PageBreak())
 
-                pdf_doc.build(story)
+                pdf_output_doc.build(story)
                 output_pdf_io.seek(0)
 
                 st.success("✨ تم إعداد الملف بنجاح!")
@@ -137,4 +146,4 @@ if uploaded_file is not None:
 
             except Exception as e:
                 st.error(f"❌ حدث خطأ أثناء المعالجة: {e}")
-                                      
+                               
