@@ -1,15 +1,15 @@
 import io
 import fitz  # PyMuPDF
 from PIL import Image
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import streamlit as st
 
-st.set_page_config(page_title="صانع الجذاذات التفاعلي", layout="centered")
+st.set_page_config(page_title="مستخرج محتوى الدروس والرياضيات", layout="centered")
 
-st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📝 صانع الجذاذات الذكي (شريحتان في كل صفحة)</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📚 استخراج الشرائح والنصوص والمعادلات الرياضية</h2>", unsafe_allow_html=True)
 st.write("---")
 
 uploaded_file = st.file_uploader("📥 ارفعي ملف الـ PDF الأصلي:", type=[".pdf"])
@@ -21,7 +21,7 @@ if uploaded_file is not None:
     total_pages = len(pdf_doc)
     st.success(f"✅ تم تحميل الـ PDF بنجاح ({total_pages} صفحة).")
 
-    st.markdown("### ✂️ إعدادات قص الهوامش")
+    st.markdown("### ✂️ إعدادات قص الهوامش للشرائح")
     col1, col2 = st.columns(2)
     with col1:
         crop_left = st.slider("القص يسار (%)", 0, 30, 0) / 100.0
@@ -48,9 +48,9 @@ if uploaded_file is not None:
             st.session_state.preview_idx += 1
             st.rerun()
 
-    # معاينة الشريحة الحالية
+    # معاينة الشريحة الحالية بدقة عالية
     current_page = pdf_doc[st.session_state.preview_idx]
-    pix = current_page.get_pixmap(dpi=120)
+    pix = current_page.get_pixmap(dpi=150)
     img = Image.open(io.BytesIO(pix.tobytes("png")))
     
     width, height = img.size
@@ -64,21 +64,36 @@ if uploaded_file is not None:
 
     st.write("---")
 
-    if st.button("📄 معالجة وقص الشرائح واستخراج النصوص (تنزيل PDF النهائي)", use_container_width=True):
-        with st.spinner("جاري قص الشرائح، استخراج النصوص والمعادلات، وتجهيز الجذاذة..."):
+    if st.button("📄 استخراج الشرائح والنصوص والمعادلات في ملف PDF جديد", use_container_width=True):
+        with st.spinner("جاري استخراج المحتوى والشرائح بدقة..."):
             try:
-                cropped_images = []
-                extracted_texts = []
+                output_pdf_io = io.BytesIO()
+                pdf_output_doc = SimpleDocTemplate(
+                    output_pdf_io,
+                    pagesize=A4,
+                    rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30
+                )
+                
+                story = []
+                styles = getSampleStyleSheet()
+                text_style = ParagraphStyle(
+                    'MathContent',
+                    parent=styles['Normal'],
+                    fontSize=11,
+                    leading=16,
+                    alignment=0
+                )
 
                 start_p = 1 if total_pages > 1 else 0
 
                 for page_num in range(start_p, total_pages):
                     p = pdf_doc[page_num]
                     
+                    # استخراج النصوص والمعادلات المتاحة في الصفحة
                     text_content = p.get_text("text").strip()
-                    extracted_texts.append(text_content if text_content else "محتوى رياضي / شريحة درس")
-
-                    p_pix = p.get_pixmap(dpi=150)
+                    
+                    # معالجة وقص صورة الشريحة للحفاظ على المعادلات المرسومة
+                    p_pix = p.get_pixmap(dpi=200)
                     p_img = Image.open(io.BytesIO(p_pix.tobytes("png")))
                     
                     w, h = p_img.size
@@ -89,6 +104,7 @@ if uploaded_file is not None:
                     
                     cropped_img = p_img.crop((l, t, r, b))
                     
+                    # تفريغ الخلفية البيضاء
                     cropped_img = cropped_img.convert("RGBA")
                     datas = cropped_img.getdata()
                     new_data = []
@@ -102,87 +118,37 @@ if uploaded_file is not None:
                     img_byte_arr = io.BytesIO()
                     cropped_img.save(img_byte_arr, format='PNG')
                     img_byte_arr.seek(0)
-                    cropped_images.append(img_byte_arr)
 
-                output_pdf_io = io.BytesIO()
-                pdf_output_doc = SimpleDocTemplate(
-                    output_pdf_io,
-                    pagesize=landscape(A4),
-                    rightMargin=12, leftMargin=12, topMargin=12, bottomMargin=12
-                )
-                
-                story = []
-                images_per_slide = 2
-                styles = getSampleStyleSheet()
-                text_style = ParagraphStyle(
-                    'MathText',
-                    parent=styles['Normal'],
-                    fontSize=10,
-                    leading=14,
-                    alignment=0
-                )
-                
-                for i in range(0, len(cropped_images), images_per_slide):
-                    slide1_io = cropped_images[i]
-                    slide2_io = cropped_images[i + 1] if i + 1 < len(cropped_images) else None
+                    # إضافة عنوان أو رقم الشريحة
+                    story.append(Paragraph(f"<b>--- الشريحة / الصفحة {page_num + 1} ---</b>", styles['Heading2']))
+                    story.append(Spacer(1, 6))
 
-                    text1 = extracted_texts[i]
-                    text2 = extracted_texts[i+1] if i + 1 < len(extracted_texts) else ""
+                    # إضافة صورة الشريحة (التي تحوي المعادلات والأشكال الرياضية)
+                    slide_img = RLImage(img_byte_arr, width=450, height=220)
+                    story.append(slide_img)
+                    story.append(Spacer(1, 10))
 
-                    # تصحيح دقيق لمعاملات الصورة بدون أخطاء
-                    img1 = RLImage(slide1_io, width=400, height=120)
-                    p1 = Paragraph(text1.replace('\n', '<br/>'), text_style)
-
-                    if slide2_io:
-                        img2 = RLImage(slide2_io, width=400, height=120)
-                        p2 = Paragraph(text2.replace('\n', '<br/>'), text_style)
-                        contenu_content = [p1, Spacer(1, 4), img1, Spacer(1, 8), p2, Spacer(1, 4), img2]
-                    else:
-                        contenu_content = [p1, Spacer(1, 4), img1]
-
-                    data = [
-                        [
-                            Paragraph("<b>Séance</b>", styles['Normal']),
-                            Paragraph("<b>Durée</b>", styles['Normal']),
-                            Paragraph("<b>Contenu & Éléments de Cours</b>", styles['Normal']),
-                            Paragraph("<b>Rôle de l'enseignant</b>", styles['Normal']),
-                            Paragraph("<b>Rôle de l'apprenant</b>", styles['Normal']),
-                            Paragraph("<b>Observation</b>", styles['Normal'])
-                        ],
-                        [
-                            "", "",
-                            contenu_content,
-                            "", "", ""
-                        ]
-                    ]
-
-                    col_widths = [40, 40, 455, 85, 85, 85]
-                    table = Table(data, colWidths=col_widths)
-                    table.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e6edf5')),
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                        ('TOPPADDING', (0, 0), (-1, -1), 4),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                    ]))
+                    # إذا وجد نص مستخرج، نضيفه أسفل الصورة
+                    if text_content:
+                        story.append(Paragraph("<b>النصوص والمعادلات المستخرجة:</b>", styles['Normal']))
+                        story.append(Spacer(1, 4))
+                        story.append(Paragraph(text_content.replace('\n', '<br/>'), text_style))
                     
-                    story.append(table)
-                    if i + images_per_slide < len(cropped_images):
-                        story.append(PageBreak())
+                    story.append(Spacer(1, 15))
+                    story.append(PageBreak())
 
                 pdf_output_doc.build(story)
                 output_pdf_io.seek(0)
 
-                st.success("✨ تم إنشاء الجذاذة واستخراج النصوص والمعادلات بنجاح!")
+                st.success("✨ تم استخراج الشرائح والمحتوى الرياضي بنجاح!")
                 st.download_button(
-                    label="📥 تحميل ملف الجذاذة النهائي (PDF)",
+                    label="📥 تحميل ملف المحتوى المستخرج (PDF)",
                     data=output_pdf_io,
-                    file_name="Fiche_Pedagogique_Complete.pdf",
+                    file_name="Cours_Et_Mathematiques.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
 
             except Exception as e:
                 st.error(f"❌ حدث خطأ أثناء المعالجة: {e}")
-            
+                
