@@ -1,93 +1,124 @@
-import streamlit as st
-import fitz  # PyMuPDF
-from pptx import Presentation
-from pptx.util import Inches
-from PIL import Image
 import io
+import fitz  # مكتبة PyMuPDF
+from PIL import Image
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet
 
-st.set_page_config(page_title="تحويل PDF إلى PPTX مع القص", layout="wide")
+def process_pdf_to_fiche(pdf_path, output_pdf_path, crop_margins=(0, 0, 0, 0)):
+    """
+    تقرأ ملف PDF، تتجاهل الشريحة الأولى، تقص الهوامش، تزيل الخلفية البيضاء،
+    وتضع شريحتين (2) في كل صفحة جذاذة ضمن جدول منظم مرتب.
+    crop_margins: (يسار، يمين، أعلى، أسفل) كقيم بين 0 و 0.3 (مثلاً 0.05 تعني 5%)
+    """
+    doc = fitz.open(pdf_path)
+    cropped_images = []
 
-st.title("🎯 تحويل صفحات PDF إلى عرض PPTX جديد مع التحكم بالقص")
-st.write("ارفعي ملف الـ PDF، وسيقوم التطبيق بعرض الصفحات كاملة بنصوصها ومعادلاتها، ثم يمكنكِ قص الهوامش وتصديرها كعرض باوربوينت جديد!")
+    c_left, c_right, c_top, c_bottom = crop_margins
 
-uploaded_pdf = st.file_uploader("📥 ارفعي ملف الـ PDF هنا:", type=["pdf"])
+    # تجاهل الشريحة الأولى تماماً والبدء من الصفحة الثانية (الفهرس 1)
+    start_page = 1 if len(doc) > 1 else 0
 
-if uploaded_pdf:
-    # قراءة صفحات الـ PDF وتحويلها إلى صور PIL
-    pdf_bytes = uploaded_pdf.read()
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    for page_num in range(start_page, len(doc)):
+        page = doc[page_num]
+        
+        # تحويل صفحة الـ PDF إلى صورة بجودة عالية
+        pix = page.get_pixmap(dpi=150)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        
+        width, height = img.size
+        
+        # حساب أبعاد القص
+        left = width * c_left
+        top = height * c_top
+        right = width * (1 - c_right)
+        bottom = height * (1 - c_bottom)
+        
+        # قص الصورة
+        cropped_img = img.crop((left, top, right, bottom))
+        
+        # إزالة الخلفية البيضاء وجعلها شفافة
+        cropped_img = cropped_img.convert("RGBA")
+        datas = cropped_img.getdata()
+        new_data = []
+        for item in datas:
+            # إذا كان اللون أبيض أو قريباً جداً من الأبيض، نجعله شفافاً
+            if item[0] > 235 and item[1] > 235 and item[2] > 235:
+                new_data.append((255, 255, 255, 0))
+            else:
+                new_data.append(item)
+        cropped_img.putdata(new_data)
+        
+        # حفظ الصورة المعالجة في الذاكرة
+        img_byte_arr = io.BytesIO()
+        cropped_img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+        cropped_images.append(img_byte_arr)
+
+    # إعداد ملف الـ PDF النهائي بتنسيق A4 أفقياً (Landscape)
+    pdf_doc = SimpleDocTemplate(
+        output_pdf_path,
+        pagesize=landscape(A4),
+        rightMargin=10, leftMargin=10, topMargin=10, bottomMargin=10
+    )
     
-    images = []
-    for page in doc:
-        pix = page.get_pixmap(dpi=150) # تحويل الصفحة إلى صورة عالية الجودة
-        img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
-        images.append(img)
+    story = []
     
-    st.success(f"✅ تم قراءة {len(images)} صفحة من ملف الـ PDF بنجاح!")
-    
-    # المعاينة والتحكم بالقص عبر الشريحة الأولى
-    first_img = images[0]
-    w, h = first_img.size
+    # وضع شريحتين (2) فقط في كل صفحة جذاذة
+    for i in range(0, len(cropped_images), 2):
+        slide1_io = cropped_images[i]
+        slide2_io = cropped_images[i+1] if i + 1 < len(cropped_images) else None
 
-    st.markdown("---")
-    st.subheader("🎛️ لوحة التحكم في قص الهوامش (معاينة حية)")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        crop_left = st.slider("✂️ القص من اليسار (%):", 0, 30, 0)
-        crop_top = st.slider("✂️ القص من الأعلى (%):", 0, 30, 0)
-    with col2:
-        crop_right = st.slider("✂️ القص من اليمين (%):", 0, 30, 0)
-        crop_bottom = st.slider("✂️ القص من الأسفل (%):", 0, 30, 0)
+        # إنشاء كائنات الصور لتأخذ عرض خانة Contenu بالكامل دون أن تصغر
+        img1 = RLImage(slide1_io, width=420, height=130, preserveAspectRatio=True)
+        
+        if slide2_io:
+            img2 = RLImage(slide2_io, width=420, height=130, preserveAspectRatio=True)
+            contenu_content = [img1, Spacer(1, 6), img2]
+        else:
+            contenu_content = [img1]
 
-    # حساب أبعاد القص بالبكسل
-    left_px = int(w * (crop_left / 100.0))
-    top_px = int(h * (crop_top / 100.0))
-    right_px = w - int(w * (crop_right / 100.0))
-    bottom_px = h - int(h * (crop_bottom / 100.0))
+        # تصميم جدول الجذاذة المطابق للنموذج المطلوب
+        data = [
+            [
+                Paragraph("<b>Séance</b>", getSampleStyleSheet()['Normal']),
+                Paragraph("<b>Durée</b>", getSampleStyleSheet()['Normal']),
+                Paragraph("<b>Contenu</b>", getSampleStyleSheet()['Normal']),
+                Paragraph("<b>Rôle de l'enseignant</b>", getSampleStyleSheet()['Normal']),
+                Paragraph("<b>Rôle de l'apprenant</b>", getSampleStyleSheet()['Normal']),
+                Paragraph("<b>Observation</b>", getSampleStyleSheet()['Normal'])
+            ],
+            [
+                "", "",
+                contenu_content,
+                "", "", ""
+            ]
+        ]
 
-    cropped_preview = first_img.crop((left_px, top_px, right_px, bottom_px))
+        # تحديد عرض الأعمدة المناسب لصفحة A4 Landscape
+        col_widths = [45, 45, 440, 90, 90, 90]
+        table = Table(data, colWidths=col_widths)
+        
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e6edf5')),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        
+        story.append(table)
+        
+        # الانتقال لصفحة جديدة إذا كانت هناك شرائح متبقية
+        if i + 2 < len(cropped_images):
+            story.append(PageBreak())
 
-    st.markdown("### 👀 معاينة للصفحة الأولى بعد القص:")
-    st.image(cropped_preview, caption="تأكدي من وضوح كافة النصوص والمعادلات الرياضية", use_column_width=True)
+    pdf_doc.build(story)
+    print(f"✅ تم إنشاء ملف الجذاذة بنجاح: {output_pdf_path}")
 
-    st.markdown("---")
-    if st.button("🚀 تطبيق القص وتوليد عرض PPTX جديد"):
-        with st.spinner("جاري قص كافة الصفحات وإنشاء ملف الباوربوينت..."):
-            prs = Presentation()
-            # ضبط مقاس الشريحة ليكون 16:9 أفقياً
-            prs.slide_width = Inches(13.333)
-            prs.slide_height = Inches(7.5)
-            blank_slide_layout = prs.slide_layouts[6]
-
-            for img in images:
-                sw, sh = img.size
-                l = int(sw * (crop_left / 100.0))
-                t = int(sh * (crop_top / 100.0))
-                r = sw - int(sw * (crop_right / 100.0))
-                b = sh - int(sh * (crop_bottom / 100.0))
-                
-                c_img = img.crop((l, t, r, b))
-                
-                # حفظ الصورة المقصوصة في الذاكرة
-                img_buf = io.BytesIO()
-                c_img.save(img_buf, format="PNG")
-                img_buf.seek(0)
-                
-                # إضافة الشريحة وتثبيت الصورة المقصوصة بداخلها
-                slide = prs.slides.add_slide(blank_slide_layout)
-                slide.shapes.add_picture(img_buf, 0, 0, width=prs.slide_width, height=prs.slide_height)
-            
-            # حفظ العرض الجديد في الذاكرة لتوفير زر التحميل
-            pptx_buf = io.BytesIO()
-            prs.save(pptx_buf)
-            pptx_buf.seek(0)
-            
-            st.success("✨ تم إنشاء العرض الجديد بنجاح!")
-            st.download_button(
-                label="📥 تحميل العرض التقديمي الجديد (.pptx)",
-                data=pptx_buf,
-                file_name="Converted_Slides.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            )
-            
+# طريقة الاستخدام (ضعي اسم ملف الـ PDF الخاص بكِ هنا):
+if __name__ == "__main__":
+    process_pdf_to_fiche("cours.pdf", "fiche_pedagogique.pdf", crop_margins=(0.02, 0.02, 0.02, 0.02))
+        
