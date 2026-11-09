@@ -9,7 +9,7 @@ import streamlit as st
 
 st.set_page_config(page_title="معالج شرائح الرياضيات", layout="centered")
 
-st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📐 معالج شرائح دروس الرياضيات (3 شرائح في الصفحة)</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📐 معالج شرائح دروس الرياضيات (جدول ممتد بالكامل)</h2>", unsafe_allow_html=True)
 st.write("---")
 
 uploaded_file = st.file_uploader("📥 ارفعي ملف الـ PDF الأصلي:", type=[".pdf"])
@@ -65,7 +65,7 @@ if uploaded_file is not None:
     st.write("---")
 
     if st.button("📄 معالجة وقص جميع الشرائح وتوليد ملف PDF النهائي", use_container_width=True):
-        with st.spinner("جاري قص الشرائح وتنسيق الجدول ليتسع لـ 3 شرائح وبناء ملف PDF..."):
+        with st.spinner("جاري قص الشرائح وتوسيع الجدول لملء الصفحة بالكامل..."):
             try:
                 cropped_images = []
                 start_p = 1 if total_pages > 1 else 0
@@ -101,14 +101,15 @@ if uploaded_file is not None:
                     cropped_images.append(img_byte_arr)
 
                 output_pdf_io = io.BytesIO()
+                # تقليل الهوامش الخارجية للصفحة ليمتد الجدول إلى الأطراف
                 pdf_output_doc = SimpleDocTemplate(
                     output_pdf_io,
                     pagesize=landscape(A4),
-                    rightMargin=12, leftMargin=12, topMargin=12, bottomMargin=12
+                    rightMargin=8, leftMargin=8, topMargin=8, bottomMargin=8
                 )
                 
                 story = []
-                images_per_page = 3  # وضع 3 شرائح في كل صفحة جدول
+                images_per_page = 3
                 styles = getSampleStyleSheet()
                 
                 for i in range(0, len(cropped_images), images_per_page):
@@ -116,17 +117,17 @@ if uploaded_file is not None:
                     slide2_io = cropped_images[i + 1] if i + 1 < len(cropped_images) else None
                     slide3_io = cropped_images[i + 2] if i + 2 < len(cropped_images) else None
 
-                    # أبعاد متناسقة لتسع 3 شرائح طولياً داخل الجدول
-                    img1 = RLImage(slide1_io, width=300, height=95)
+                    # تكبير الصور لتملأ الخانة وتصل لآخر الصفحة
+                    img1 = RLImage(slide1_io, width=350, height=145)
                     contenu_content = [img1]
 
                     if slide2_io:
-                        img2 = RLImage(slide2_io, width=300, height=95)
-                        contenu_content.extend([Spacer(1, 6), img2])
+                        img2 = RLImage(slide2_io, width=350, height=145)
+                        contenu_content.extend([Spacer(1, 4), img2])
                         
                     if slide3_io:
-                        img3 = RLImage(slide3_io, width=300, height=95)
-                        contenu_content.extend([Spacer(1, 6), img3])
+                        img3 = RLImage(slide3_io, width=350, height=145)
+                        contenu_content.extend([Spacer(1, 4), img3])
 
                     data = [
                         [
@@ -144,8 +145,8 @@ if uploaded_file is not None:
                         ]
                     ]
 
-                    # عرض خانة Contenu مطابق تماماً لعرض الصور (300)
-                    col_widths = [55, 55, 300, 115, 115, 115]
+                    # توسيع أعمدة الجدول الإجمالية لتغطي عرض الصفحة الأفقية كاملاً (826pt)
+                    col_widths = [60, 60, 360, 115, 115, 116]
                     table = Table(data, colWidths=col_widths)
                     table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e6edf5')),
@@ -163,15 +164,15 @@ if uploaded_file is not None:
                 pdf_output_doc.build(story)
                 output_pdf_io.seek(0)
 
-                st.success("✨ تم إنشاء الملف بنجاح وبواقع 3 شرائح في الصفحة!")
+                st.success("✨ تم إنشاء الملف بنجاح! الجدول ممتد الآن بالكامل إلى حدود الصفحة.")
                 st.download_button(
                     label="📥 تحميل الملف النهائي (PDF)",
                     data=output_pdf_io,
-                    file_name="Cours_Maths_3Slides.pdf",
+                    file_name="Cours_Maths_FullPage.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
 
             except Exception as e:
                 st.error(f"❌ حدث خطأ أثناء المعالجة: {e}")
-                
+            
