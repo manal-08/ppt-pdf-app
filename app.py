@@ -5,7 +5,6 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfgen import canvas
 import streamlit as st
 
 st.set_page_config(page_title="صانع الجذاذات التفاعلي", layout="centered")
@@ -22,7 +21,6 @@ if uploaded_file is not None:
     total_pages = len(pdf_doc)
     st.success(f"✅ تم تحميل الـ PDF بنجاح ({total_pages} صفحة).")
 
-    # إعدادات القص (تم إصلاح وتصحيح معادلة القص من الأسفل بدقة)
     st.markdown("### ✂️ إعدادات قص الهوامش")
     col1, col2 = st.columns(2)
     with col1:
@@ -59,7 +57,7 @@ if uploaded_file is not None:
     p_left = width * crop_left
     p_top = height * crop_top
     p_right = width * (1 - crop_right)
-    p_bottom = height * (1 - crop_bottom) # تصحيح حساب القص السفلي بدقة
+    p_bottom = height * (1 - crop_bottom)
     
     preview_img = img.crop((p_left, p_top, p_right, p_bottom))
     st.image(preview_img, use_column_width=True)
@@ -77,11 +75,9 @@ if uploaded_file is not None:
                 for page_num in range(start_p, total_pages):
                     p = pdf_doc[page_num]
                     
-                    # استخراج النصوص والفقرات والمعادلات من صفحة الـ PDF مباشرة
                     text_content = p.get_text("text").strip()
                     extracted_texts.append(text_content if text_content else "محتوى رياضي / شريحة درس")
 
-                    # معالجة وقص الصورة
                     p_pix = p.get_pixmap(dpi=150)
                     p_img = Image.open(io.BytesIO(p_pix.tobytes("png")))
                     
@@ -89,11 +85,10 @@ if uploaded_file is not None:
                     l = w * crop_left
                     t = h * crop_top
                     r = w * (1 - crop_right)
-                    b = h * (1 - crop_bottom) # تصحيح دقيق لمعادلة القص السفلي
+                    b = h * (1 - crop_bottom)
                     
                     cropped_img = p_img.crop((l, t, r, b))
                     
-                    # إزالة الخلفية البيضاء وجعلها شفافة
                     cropped_img = cropped_img.convert("RGBA")
                     datas = cropped_img.getdata()
                     new_data = []
@@ -109,7 +104,6 @@ if uploaded_file is not None:
                     img_byte_arr.seek(0)
                     cropped_images.append(img_byte_arr)
 
-                # بناء ملف الـ PDF النهائي للجذاذة
                 output_pdf_io = io.BytesIO()
                 pdf_output_doc = SimpleDocTemplate(
                     output_pdf_io,
@@ -125,7 +119,7 @@ if uploaded_file is not None:
                     parent=styles['Normal'],
                     fontSize=10,
                     leading=14,
-                    alignment=0 # محاذاة يسار أو لغوياً حسب محتوى الرياضيات
+                    alignment=0
                 )
                 
                 for i in range(0, len(cropped_images), images_per_slide):
@@ -135,11 +129,12 @@ if uploaded_file is not None:
                     text1 = extracted_texts[i]
                     text2 = extracted_texts[i+1] if i + 1 < len(extracted_texts) else ""
 
-                    img1 = RLImage(slide1_io, width=400, height=120, preserveAspectRatio=True)
+                    # تصحيح دقيق لمعاملات الصورة بدون أخطاء
+                    img1 = RLImage(slide1_io, width=400, height=120)
                     p1 = Paragraph(text1.replace('\n', '<br/>'), text_style)
 
                     if slide2_io:
-                        img2 = RLImage(slide2_io, width=400, height=120, preserveAspectRatio=True)
+                        img2 = RLImage(slide2_io, width=400, height=120)
                         p2 = Paragraph(text2.replace('\n', '<br/>'), text_style)
                         contenu_content = [p1, Spacer(1, 4), img1, Spacer(1, 8), p2, Spacer(1, 4), img2]
                     else:
@@ -190,4 +185,4 @@ if uploaded_file is not None:
 
             except Exception as e:
                 st.error(f"❌ حدث خطأ أثناء المعالجة: {e}")
-    
+            
