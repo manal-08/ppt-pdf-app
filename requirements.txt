@@ -1,5 +1,6 @@
  streamlit
 PyMuPDF
+reportlab
 python-pptx
 Pillow
 streamlit
