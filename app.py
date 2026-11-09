@@ -1,59 +1,175 @@
-import streamlit as st
+import io
+import fitz  # PyMuPDF
 from PIL import Image
-import easyocr
-import numpy as np
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet
+import streamlit as st
 
-# إعداد صفحة التطبيق
-st.set_page_config(page_title="مستخرج النص والمعادلات من الصور", layout="centered")
+st.set_page_config(page_title="معالج شرائح الرياضيات", layout="centered")
 
-st.markdown("<h2 style='text-align: center; color: #2c3e50;'>🔍 قراءة واستخراج المحتوى الرياضي من الصور</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📐 معالج شرائح دروس الرياضيات (قص ومعاينة وتصدير PDF)</h2>", unsafe_allow_html=True)
 st.write("---")
 
-# تحميل نموذج التعرف البصري (يدعم الإنجليزية والفرنسية والرموز الرياضية)
-@st.cache_resource
-def load_reader():
-    # 'en' و 'fr' ممتازان لقراءة الرموز الرياضية والأسس والمعادلات والفرنسية
-    return easyocr.Reader(['en', 'fr'], gpu=False)
+uploaded_file = st.file_uploader("📥 ارفعي ملف الـ PDF الأصلي:", type=[".pdf"])
 
-with st.spinner("جاري تجهيز محرك القراءة والذكاء الاصطناعي..."):
-    reader = load_reader()
-
-# زر لرفع الصورة
-uploaded_image = st.file_uploader("📥 ارفعي صورة الشريحة أو التمرين الرياضي هنا:", type=["png", "jpg", "jpeg"])
-
-if uploaded_image is not None:
-    # فتح الصورة وعرضها في شاشة المعاينة
-    image = Image.open(uploaded_image)
+if uploaded_file is not None:
+    pdf_bytes = uploaded_file.read()
+    pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     
-    st.markdown("### 👁️ شاشة المعاينة للصورة المرفوعة:")
-    st.image(image, use_column_width=True)
-    
+    total_pages = len(pdf_doc)
+    st.success(f"✅ تم تحميل الـ PDF بنجاح ({total_pages} صفحة).")
+
+    # إعدادات القص
+    st.markdown("### ✂️ إعدادات قص الهوامش")
+    col1, col2 = st.columns(2)
+    with col1:
+        crop_left = st.slider("القص يسار (%)", 0, 30, 0) / 100.0
+        crop_top = st.slider("القص أعلى (%)", 0, 30, 0) / 100.0
+    with col2:
+        crop_right = st.slider("القص يمين (%)", 0, 30, 0) / 100.0
+        crop_bottom = st.slider("القص أسفل (%)", 0, 30, 0) / 100.0
+
     st.write("---")
+    st.markdown("### 👁️ معاينة الشرائح شريحة تلو الأخرى (تجاهل الشريحة الأولى)")
+
+    # إدارة التنقل بين الشرائح بالضغط على الأزرار
+    if 'preview_idx' not in st.session_state:
+        st.session_state.preview_idx = 1 if total_pages > 1 else 0
+
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
+    with nav_col1:
+        if st.button("⬅️ السابقة") and st.session_state.preview_idx > 1:
+            st.session_state.preview_idx -= 1
+            st.rerun()
+    with nav_col2:
+        st.markdown(f"<p style='text-align: center; font-weight: bold;'>الشريحة: {st.session_state.preview_idx + 1} من {total_pages}</p>", unsafe_allow_html=True)
+    with nav_col3:
+        if st.button("التالية ➡️") and st.session_state.preview_idx < total_pages - 1:
+            st.session_state.preview_idx += 1
+            st.rerun()
+
+    # معاينة الشريحة الحالية بعد القص
+    current_page = pdf_doc[st.session_state.preview_idx]
+    pix = current_page.get_pixmap(dpi=150)
+    img = Image.open(io.BytesIO(pix.tobytes("png")))
     
-    # زر لبدء عملية الاستخراج
-    if st.button("🚀 استخراج النصوص والمعادلات من الصورة", use_container_width=True):
-        with st.spinner("جاري قراءة وتحليل محتوى الصورة الرياضي..."):
+    width, height = img.size
+    p_left = width * crop_left
+    p_top = height * crop_top
+    p_right = width * (1.0 - crop_right)
+    p_bottom = height * (1.0 - crop_bottom)  # تصحيح حساب القص من الأسفل
+    
+    preview_img = img.crop((p_left, p_top, p_right, p_bottom))
+    st.image(preview_img, use_column_width=True)
+
+    st.write("---")
+
+    if st.button("📄 معالجة وقص جميع الشرائح وتوليد ملف PDF النهائي", use_container_width=True):
+        with st.spinner("جاري قص الشرائح وتفريغ الخلفية وبناء ملف PDF..."):
             try:
-                # تحويل الصورة إلى مصفوفة مناسبة للمحرك
-                image_np = np.array(image)
+                cropped_images = []
+                start_p = 1 if total_pages > 1 else 0
+
+                for page_num in range(start_p, total_pages):
+                    p = pdf_doc[page_num]
+                    
+                    # جودة تصدير 200 DPI للحفاظ على دقة المعادلات والكسور
+                    p_pix = p.get_pixmap(dpi=200)
+                    p_img = Image.open(io.BytesIO(p_pix.tobytes("png")))
+                    
+                    w, h = p_img.size
+                    l = w * crop_left
+                    t = h * crop_top
+                    r = w * (1.0 - crop_right)
+                    b = h * (1.0 - crop_bottom)
+                    
+                    cropped_img = p_img.crop((l, t, r, b))
+                    
+                    # إزالة الخلفية البيضاء وجعلها شفافة
+                    cropped_img = cropped_img.convert("RGBA")
+                    datas = cropped_img.getdata()
+                    new_data = []
+                    for item in datas:
+                        if item[0] > 235 and item[1] > 235 and item[2] > 235:
+                            new_data.append((255, 255, 255, 0))
+                        else:
+                            new_data.append(item)
+                    cropped_img.putdata(new_data)
+                    
+                    img_byte_arr = io.BytesIO()
+                    cropped_img.save(img_byte_arr, format='PNG')
+                    img_byte_arr.seek(0)
+                    cropped_images.append(img_byte_arr)
+
+                # بناء ملف الـ PDF النهائي (شريحتين في كل صفحة A4 أفقية)
+                output_pdf_io = io.BytesIO()
+                pdf_output_doc = SimpleDocTemplate(
+                    output_pdf_io,
+                    pagesize=landscape(A4),
+                    rightMargin=12, leftMargin=12, topMargin=12, bottomMargin=12
+                )
                 
-                # استخراج النصوص والرموز
-                results = reader.readtext(image_np)
+                story = []
+                images_per_page = 2
+                styles = getSampleStyleSheet()
                 
-                # تجميع النصوص المستخرجة
-                extracted_text_lines = []
-                for (bbox, text, prob) in results:
-                    # تصفية النتائج الضعيفة لضمان دقة عالية
-                    if prob > 0.2: 
-                        extracted_text_lines.append(text)
-                
-                full_extracted_text = "\n".join(extracted_text_lines)
-                
-                st.success("✨ تم استخراج المحتوى بنجاح!")
-                
-                # عرض النص المستخرج في مربع قابل للنسخ
-                st.markdown("### 📝 المحتوى المستخرج (النصوص والمعادلات):")
-                st.text_area("يمكنك نسخه واستخدامه مباشرة:", value=full_extracted_text, height=200)
+                for i in range(0, len(cropped_images), images_per_page):
+                    slide1_io = cropped_images[i]
+                    slide2_io = cropped_images[i + 1] if i + 1 < len(cropped_images) else None
+
+                    img1 = RLImage(slide1_io, width=440, height=135)
+                    
+                    if slide2_io:
+                        img2 = RLImage(slide2_io, width=440, height=135)
+                        contenu_content = [img1, Spacer(1, 10), img2]
+                    else:
+                        contenu_content = [img1]
+
+                    data = [
+                        [
+                            Paragraph("<b>Séance</b>", styles['Normal']),
+                            Paragraph("<b>Durée</b>", styles['Normal']),
+                            Paragraph("<b>Contenu (Éléments du cours)</b>", styles['Normal']),
+                            Paragraph("<b>Rôle de l'enseignant</b>", styles['Normal']),
+                            Paragraph("<b>Rôle de l'apprenant</b>", styles['Normal']),
+                            Paragraph("<b>Observation</b>", styles['Normal'])
+                        ],
+                        [
+                            "", "",
+                            contenu_content,
+                            "", "", ""
+                        ]
+                    ]
+
+                    col_widths = [45, 45, 450, 85, 85, 85]
+                    table = Table(data, colWidths=col_widths)
+                    table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e6edf5')),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                        ('TOPPADDING', (0, 0), (-1, -1), 4),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                    ]))
+                    
+                    story.append(table)
+                    if i + images_per_page < len(cropped_images):
+                        story.append(PageBreak())
+
+                pdf_output_doc.build(story)
+                output_pdf_io.seek(0)
+
+                st.success("✨ تم معالجة وتوليد الملف بنجاح مع حفظ سلامة كافة المعادلا والرموز!")
+                st.download_button(
+                    label="📥 تحميل الملف النهائي (PDF)",
+                    data=output_pdf_io,
+                    file_name="Cours_Maths_Clean.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
 
             except Exception as e:
-                st.error(f"❌ حدث خطأ أثناء قراءة الصورة: {e}")
+                st.error(f"❌ حدث خطأ أثناء المعالجة: {e}")
+                
