@@ -7,3 +7,4 @@ streamlit
 fpdf2
 easyocr
 numpy
+opencv-python-headless
