@@ -9,7 +9,7 @@ import streamlit as st
 
 st.set_page_config(page_title="معالج شرائح الرياضيات", layout="centered")
 
-st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📐 معالج شرائح دروس الرياضيات (قص ومعاينة وتصدير PDF)</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #2c3e50;'>📐 معالج شرائح دروس الرياضيات (ضبط عرض الجدول مع الصور)</h2>", unsafe_allow_html=True)
 st.write("---")
 
 uploaded_file = st.file_uploader("📥 ارفعي ملف الـ PDF الأصلي:", type=[".pdf"])
@@ -32,9 +32,8 @@ if uploaded_file is not None:
         crop_bottom = st.slider("القص أسفل (%)", 0, 30, 0) / 100.0
 
     st.write("---")
-    st.markdown("### 👁️ معاينة الشرائح شريحة تلو الأخرى (تجاهل الشريحة الأولى)")
+    st.markdown("### 👁️ معاينة الشرائح (تجاهل الشريحة الأولى)")
 
-    # إدارة التنقل بين الشرائح بالضغط على الأزرار
     if 'preview_idx' not in st.session_state:
         st.session_state.preview_idx = 1 if total_pages > 1 else 0
 
@@ -50,7 +49,6 @@ if uploaded_file is not None:
             st.session_state.preview_idx += 1
             st.rerun()
 
-    # معاينة الشريحة الحالية بعد القص
     current_page = pdf_doc[st.session_state.preview_idx]
     pix = current_page.get_pixmap(dpi=150)
     img = Image.open(io.BytesIO(pix.tobytes("png")))
@@ -59,7 +57,7 @@ if uploaded_file is not None:
     p_left = width * crop_left
     p_top = height * crop_top
     p_right = width * (1.0 - crop_right)
-    p_bottom = height * (1.0 - crop_bottom)  # تصحيح حساب القص من الأسفل
+    p_bottom = height * (1.0 - crop_bottom)
     
     preview_img = img.crop((p_left, p_top, p_right, p_bottom))
     st.image(preview_img, use_column_width=True)
@@ -67,7 +65,7 @@ if uploaded_file is not None:
     st.write("---")
 
     if st.button("📄 معالجة وقص جميع الشرائح وتوليد ملف PDF النهائي", use_container_width=True):
-        with st.spinner("جاري قص الشرائح وتفريغ الخلفية وبناء ملف PDF..."):
+        with st.spinner("جاري قص الشرائح وتنسيق أبعاد الجدول والصور وبناء ملف PDF..."):
             try:
                 cropped_images = []
                 start_p = 1 if total_pages > 1 else 0
@@ -75,7 +73,6 @@ if uploaded_file is not None:
                 for page_num in range(start_p, total_pages):
                     p = pdf_doc[page_num]
                     
-                    # جودة تصدير 200 DPI للحفاظ على دقة المعادلات والكسور
                     p_pix = p.get_pixmap(dpi=200)
                     p_img = Image.open(io.BytesIO(p_pix.tobytes("png")))
                     
@@ -87,7 +84,7 @@ if uploaded_file is not None:
                     
                     cropped_img = p_img.crop((l, t, r, b))
                     
-                    # إزالة الخلفية البيضاء وجعلها شفافة
+                    # تفريغ الخلفية البيضاء
                     cropped_img = cropped_img.convert("RGBA")
                     datas = cropped_img.getdata()
                     new_data = []
@@ -103,7 +100,6 @@ if uploaded_file is not None:
                     img_byte_arr.seek(0)
                     cropped_images.append(img_byte_arr)
 
-                # بناء ملف الـ PDF النهائي (شريحتين في كل صفحة A4 أفقية)
                 output_pdf_io = io.BytesIO()
                 pdf_output_doc = SimpleDocTemplate(
                     output_pdf_io,
@@ -119,10 +115,11 @@ if uploaded_file is not None:
                     slide1_io = cropped_images[i]
                     slide2_io = cropped_images[i + 1] if i + 1 < len(cropped_images) else None
 
-                    img1 = RLImage(slide1_io, width=440, height=135)
+                    # عرض الصورة مضبوط على 320 بكسل
+                    img1 = RLImage(slide1_io, width=320, height=140, preserveAspectRatio=True)
                     
                     if slide2_io:
-                        img2 = RLImage(slide2_io, width=440, height=135)
+                        img2 = RLImage(slide2_io, width=320, height=140, preserveAspectRatio=True)
                         contenu_content = [img1, Spacer(1, 10), img2]
                     else:
                         contenu_content = [img1]
@@ -143,15 +140,16 @@ if uploaded_file is not None:
                         ]
                     ]
 
-                    col_widths = [45, 45, 450, 85, 85, 85]
+                    # تم ضبط عرض خانة Contenu لتكون 320 تماماً مثل عرض الصور
+                    col_widths = [55, 55, 320, 110, 110, 110]
                     table = Table(data, colWidths=col_widths)
                     table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e6edf5')),
                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                        ('TOPPADDING', (0, 0), (-1, -1), 4),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                        ('TOPPADDING', (0, 0), (-1, -1), 6),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
                     ]))
                     
                     story.append(table)
@@ -161,7 +159,7 @@ if uploaded_file is not None:
                 pdf_output_doc.build(story)
                 output_pdf_io.seek(0)
 
-                st.success("✨ تم معالجة وتوليد الملف بنجاح مع حفظ سلامة كافة المعادلا والرموز!")
+                st.success("✨ تم تعديل عرض خانة Contenu لتتطابق تماماً مع عرض الصور!")
                 st.download_button(
                     label="📥 تحميل الملف النهائي (PDF)",
                     data=output_pdf_io,
@@ -172,4 +170,4 @@ if uploaded_file is not None:
 
             except Exception as e:
                 st.error(f"❌ حدث خطأ أثناء المعالجة: {e}")
-                
+                        
