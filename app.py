@@ -9,7 +9,7 @@ import streamlit as st
 
 st.set_page_config(page_title="منظم شرائح الرياضيات", layout="wide", initial_sidebar_state="collapsed")
 
-# 🎨 تصميم وتجميل الواجهة بالأنماط
+# 🎨 تصميم الواجهة وتنسيق مربع الرفع الأزرق العصري
 st.markdown("""
 <style>
     .stApp {
@@ -17,33 +17,53 @@ st.markdown("""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     .main-title {
-        color: #4c1d95;
+        color: #1e3a8a;
         font-weight: 800;
         text-align: center;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     .sub-title {
-        color: #6b7280;
+        color: #64748b;
         text-align: center;
         font-size: 1.1rem;
-        margin-bottom: 30px;
+        margin-bottom: 25px;
     }
+    
+    /* تنسيق زر الرفع الافتراضي في ستريمليت ليتطابق مع الشكل المطلوب */
+    [data-testid="stFileUploader"] {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        border-radius: 24px;
+        padding: 30px;
+        box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        text-align: center;
+        color: white;
+    }
+    [data-testid="stFileUploader"] section {
+        border: 2px dashed rgba(255, 255, 255, 0.6) !important;
+        border-radius: 16px;
+        background-color: transparent !important;
+    }
+    [data-testid="stFileUploader"] span, [data-testid="stFileUploader"] small, [data-testid="stFileUploader"] p {
+        color: white !important;
+    }
+
+    /* تنسيق الأزرار الأساسية */
     .stButton>button {
-        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         color: white !important;
         font-weight: bold !important;
         font-size: 1.1rem !important;
         padding: 12px 28px !important;
-        border-radius: 12px !important;
+        border-radius: 14px !important;
         border: none !important;
-        box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3) !important;
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3) !important;
         transition: all 0.3s ease !important;
         width: 100%;
     }
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4) !important;
-        background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -53,34 +73,31 @@ if 'step' not in st.session_state:
     st.session_state.step = 1
 
 # ==========================================
-# الصفحة الأولى: مربع التحميل وتحته زر المتابعة
+# الصفحة الأولى: مربع التحميل الأزرق وتحته زر المتابعة
 # ==========================================
 if st.session_state.step == 1:
     st.markdown("<h1 class='main-title'>📐 منصة إعداد جذاذات الرياضيات</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-title'>المرجو تحميل ملف الـ PDF الخاص بالدرس للبدء</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>المرجو رفع ملف الـ PDF الخاص بالدرس للبدء</p>", unsafe_allow_html=True)
     
-    col_center1, col_center2, col_center3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     
-    with col_center2:
-        # مربع تحميل الـ PDF
-        uploaded_file = st.file_uploader("📥 اختر ملف الـ PDF", type=[".pdf"])
+    with col2:
+        uploaded_file = st.file_uploader("Upload", type=[".pdf"])
         
         if uploaded_file is not None:
             st.session_state.pdf_bytes = uploaded_file.read()
             st.success("✅ تم رفع الملف بنجاح!")
             
             st.write("")
-            # زر المتابعة يظهر تحت مربع التحميل مباشرة
             if st.button("متابعة ➔"):
                 st.session_state.step = 2
                 st.rerun()
 
 # ==========================================
-# الصفحة الثانية: المعاينة، أدوات القص، وزر توليد PDF في الأعلى
+# الصفحة الثانية: المعاينة، أدوات القص، وزر توليد الـ PDF في الأعلى
 # ==========================================
 elif st.session_state.step == 2:
     
-    # زر توليد جذاذة الـ PDF في أعلى الصفحة
     top_col1, top_col2, top_col3 = st.columns([1, 2, 1])
     with top_col2:
         if st.button("✨ توليد وتنزيل جذاذة الـ PDF النهائية ✨"):
@@ -201,21 +218,20 @@ elif st.session_state.step == 2:
 
     st.write("---")
     
-    # المعاينة وأدوات القص
     pdf_doc = fitz.open(stream=st.session_state.pdf_bytes, filetype="pdf")
     total_pages = len(pdf_doc)
 
     col_preview, col_controls = st.columns([2, 1])
 
     with col_controls:
-        st.markdown("<h3 style='color: #4c1d95;'>✂️ التحكم في القص</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #1e3a8a;'>✂️ التحكم في القص</h3>", unsafe_allow_html=True)
         st.session_state.crop_left = st.slider("القص يسار (%)", 0, 30, 0)
         st.session_state.crop_right = st.slider("القص يمين (%)", 0, 30, 0)
         st.session_state.crop_top = st.slider("القص أعلى (%)", 0, 30, 0)
         st.session_state.crop_bottom = st.slider("القص أسفل (%)", 0, 30, 0)
 
     with col_preview:
-        st.markdown("<h3 style='color: #4c1d95;'>👁️ معاينة الشريحة الحالية</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #1e3a8a;'>👁️ معاينة الشريحة الحالية</h3>", unsafe_allow_html=True)
         
         if 'preview_idx' not in st.session_state:
             st.session_state.preview_idx = 1 if total_pages > 1 else 0
@@ -226,7 +242,7 @@ elif st.session_state.step == 2:
                 st.session_state.preview_idx -= 1
                 st.rerun()
         with nav2:
-            st.markdown(f"<h4 style='text-align: center; color: #6d28d9;'>الشريحة {st.session_state.preview_idx + 1} من {total_pages}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='text-align: center; color: #2563eb;'>الشريحة {st.session_state.preview_idx + 1} من {total_pages}</h4>", unsafe_allow_html=True)
         with nav3:
             if st.button("التالية ➡️") and st.session_state.preview_idx < total_pages - 1:
                 st.session_state.preview_idx += 1
@@ -249,4 +265,3 @@ elif st.session_state.step == 2:
     if st.button("🔙 العودة لرفع ملف آخر"):
         st.session_state.step = 1
         st.rerun()
-    
