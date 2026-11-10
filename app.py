@@ -9,28 +9,13 @@ import streamlit as st
 
 st.set_page_config(page_title="منظم شرائح الرياضيات", layout="wide", initial_sidebar_state="collapsed")
 
-# 🎨 لمسات CSS لتجميل الألوان والواجهة بالكامل
+# 🎨 تصميم وتجميل الواجهة بالأنماط
 st.markdown("""
 <style>
-    /* خلفية الصفحة وتحسين الخطوط */
     .stApp {
         background-color: #f8fafc;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    
-    /* تصميم بطاقات الخطوة الأولى */
-    .upload-card {
-        background-color: #ffffff;
-        padding: 40px;
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-        border: 2px dashed #8b5cf6;
-        text-align: center;
-        margin: 20px auto;
-        max-width: 650px;
-    }
-    
-    /* عناوين جذابة */
     .main-title {
         color: #4c1d95;
         font-weight: 800;
@@ -43,8 +28,6 @@ st.markdown("""
         font-size: 1.1rem;
         margin-bottom: 30px;
     }
-
-    /* تخصيص زر الاستمرار والتوليد */
     .stButton>button {
         background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
         color: white !important;
@@ -62,51 +45,46 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4) !important;
         background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
     }
-
-    /* تحسين أشرطة التمرير الخاصة بالقص */
-    div[data-baseweb="slider"] {
-        padding-top: 10px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# إدارة حالة الانتقال بين الصفحات
+# إدارة خطوات الانتقال بين الصفحات
 if 'step' not in st.session_state:
     st.session_state.step = 1
 
 # ==========================================
-# الصفحة الأولى: رفع الملف وتصميم جذاب
+# الصفحة الأولى: مربع التحميل وتحته زر المتابعة
 # ==========================================
 if st.session_state.step == 1:
     st.markdown("<h1 class='main-title'>📐 منصة إعداد جذاذات الرياضيات</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-title'>قم برفع ملف الدرس لتوليد جذاذة مقصوصة ومنظمة بدقة عالية</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>المرجو تحميل ملف الـ PDF الخاص بالدرس للبدء</p>", unsafe_allow_html=True)
     
-    st.markdown("<div class='upload-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #6d28d9; margin-bottom: 15px;'>📤 اختر ملف الـ PDF الخاص بالدرس</h3>", unsafe_allow_html=True)
+    col_center1, col_center2, col_center3 = st.columns([1, 2, 1])
     
-    uploaded_file = st.file_uploader("", type=[".pdf"], label_visibility="collapsed")
-    
-    if uploaded_file is not None:
-        st.session_state.pdf_bytes = uploaded_file.read()
-        st.markdown("<div style='color: #059669; font-weight: bold; margin: 15px 0;'>✅ تم تحميل الملف بنجاح! جاهز للانتقال للخطوة التالية.</div>", unsafe_allow_html=True)
+    with col_center2:
+        # مربع تحميل الـ PDF
+        uploaded_file = st.file_uploader("📥 اختر ملف الـ PDF", type=[".pdf"])
         
-        st.write("")
-        if st.button("Continue / الانتقال لقص الشرائح ➔"):
-            st.session_state.step = 2
-            st.rerun()
+        if uploaded_file is not None:
+            st.session_state.pdf_bytes = uploaded_file.read()
+            st.success("✅ تم رفع الملف بنجاح!")
             
-    st.markdown("</div>", unsafe_allow_html=True)
+            st.write("")
+            # زر المتابعة يظهر تحت مربع التحميل مباشرة
+            if st.button("متابعة ➔"):
+                st.session_state.step = 2
+                st.rerun()
 
 # ==========================================
-# الصفحة الثانية: المعاينة، أزرار القص، وتوليد PDF
+# الصفحة الثانية: المعاينة، أدوات القص، وزر توليد PDF في الأعلى
 # ==========================================
 elif st.session_state.step == 2:
     
-    # 1. زر توليد الجذاذة النهائي في الأعلى بعرض ممتاز
+    # زر توليد جذاذة الـ PDF في أعلى الصفحة
     top_col1, top_col2, top_col3 = st.columns([1, 2, 1])
     with top_col2:
         if st.button("✨ توليد وتنزيل جذاذة الـ PDF النهائية ✨"):
-            with st.spinner("جاري قص الشرائح وتوليد الملف بحجم ممتد ونظيف..."):
+            with st.spinner("جاري قص الشرائح وتنسيق الجدول الممتد وتوليد ملف PDF..."):
                 try:
                     pdf_doc = fitz.open(stream=st.session_state.pdf_bytes, filetype="pdf")
                     total_pages = len(pdf_doc)
@@ -209,11 +187,11 @@ elif st.session_state.step == 2:
                     pdf_output_doc.build(story)
                     output_pdf_io.seek(0)
 
-                    st.success("🎉 تم توليد جذاذة الـ PDF بنجاح!")
+                    st.success("🎉 تم إنشاء جذاذة الـ PDF بنجاح!")
                     st.download_button(
                         label="📥 اضغطي هنا لتنزيل ملف الـ PDF الجاهز",
                         data=output_pdf_io,
-                        file_name="Jadada_Maths_Clean.pdf",
+                        file_name="Jadada_Maths.pdf",
                         mime="application/pdf",
                         use_container_width=True
                     )
@@ -223,7 +201,7 @@ elif st.session_state.step == 2:
 
     st.write("---")
     
-    # 2. عرض معاينة الشرائح على اليسار وعناصر القص على اليمين
+    # المعاينة وأدوات القص
     pdf_doc = fitz.open(stream=st.session_state.pdf_bytes, filetype="pdf")
     total_pages = len(pdf_doc)
 
@@ -231,8 +209,6 @@ elif st.session_state.step == 2:
 
     with col_controls:
         st.markdown("<h3 style='color: #4c1d95;'>✂️ التحكم في القص</h3>", unsafe_allow_html=True)
-        st.write("اضبطي المقاسات ليتم تطبيقها على كل الشرائح:")
-        
         st.session_state.crop_left = st.slider("القص يسار (%)", 0, 30, 0)
         st.session_state.crop_right = st.slider("القص يمين (%)", 0, 30, 0)
         st.session_state.crop_top = st.slider("القص أعلى (%)", 0, 30, 0)
@@ -246,13 +222,13 @@ elif st.session_state.step == 2:
 
         nav1, nav2, nav3 = st.columns([1, 2, 1])
         with nav1:
-            if st.button("⬅️ الشريحة السابقة") and st.session_state.preview_idx > 1:
+            if st.button("⬅️ السابقة") and st.session_state.preview_idx > 1:
                 st.session_state.preview_idx -= 1
                 st.rerun()
         with nav2:
             st.markdown(f"<h4 style='text-align: center; color: #6d28d9;'>الشريحة {st.session_state.preview_idx + 1} من {total_pages}</h4>", unsafe_allow_html=True)
         with nav3:
-            if st.button("الشريحة التالية ➡️") and st.session_state.preview_idx < total_pages - 1:
+            if st.button("التالية ➡️") and st.session_state.preview_idx < total_pages - 1:
                 st.session_state.preview_idx += 1
                 st.rerun()
 
@@ -270,6 +246,7 @@ elif st.session_state.step == 2:
         st.image(preview_img, use_column_width=True)
 
     st.write("---")
-    if st.button("🔙 العودة لرفع ملف آخر", use_container_width=False):
+    if st.button("🔙 العودة لرفع ملف آخر"):
         st.session_state.step = 1
         st.rerun()
+    
